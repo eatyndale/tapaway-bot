@@ -23,6 +23,8 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [signUpEmailSent, setSignUpEmailSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,22 +37,72 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
       if (isLogin) {
         result = await supabaseService.signIn(email, password);
         if (result.error) {
-          throw new Error(result.error.message);
+          const errorMessage = supabaseService.parseAuthError(result.error);
+          throw new Error(errorMessage);
         }
         onSuccess();
       } else {
         result = await supabaseService.signUp(name, email, password);
         if (result.error) {
-          throw new Error(result.error.message);
+          const errorMessage = supabaseService.parseAuthError(result.error);
+          throw new Error(errorMessage);
         }
+        setSignUpEmailSent(true);
         toast({
-          title: "Confirmation email sent!",
-          description: "Please check your inbox to verify your account.",
+          title: "Check your email!",
+          description: "We've sent a verification link to your inbox.",
         });
-        // Don't call onSuccess immediately for signup, let user verify email
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Authentication failed");
+      const errorMessage = err instanceof Error ? err.message : "Authentication failed";
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    if (resendCooldown > 0) return;
+    
+    setLoading(true);
+    setError("");
+
+    try {
+      const { error } = await supabaseService.resendConfirmationEmail(email);
+      if (error) {
+        const errorMessage = supabaseService.parseAuthError(error);
+        throw new Error(errorMessage);
+      }
+      
+      toast({
+        title: "Email resent!",
+        description: "Check your inbox for the new verification link.",
+      });
+      
+      // Start 60-second cooldown
+      setResendCooldown(60);
+      const interval = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to resend email";
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -170,6 +222,56 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
                   </form>
                 )}
               </>
+            ) : signUpEmailSent ? (
+              <div className="space-y-4">
+                <div className="text-center space-y-3 p-6 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg text-gray-900">Check your email</h3>
+                    <p className="text-sm text-gray-600 mt-2">
+                      We sent a verification link to <strong>{email}</strong>
+                    </p>
+                  </div>
+                  <div className="text-xs text-gray-500 space-y-1 mt-4">
+                    <p>• Click the link in the email to verify your account</p>
+                    <p>• Check your spam folder if you don't see it</p>
+                    <p>• The link expires after 24 hours</p>
+                  </div>
+                </div>
+                
+                {error && (
+                  <div className="text-red-600 text-sm text-center p-2 bg-red-50 rounded">
+                    {error}
+                  </div>
+                )}
+                
+                <Button
+                  onClick={handleResendEmail}
+                  disabled={loading || resendCooldown > 0}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {loading ? "Sending..." : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Verification Email"}
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setSignUpEmailSent(false);
+                    setEmail("");
+                    setPassword("");
+                    setName("");
+                    setError("");
+                  }}
+                  className="w-full text-primary hover:text-primary/80"
+                >
+                  Use a Different Email
+                </Button>
+              </div>
             ) : (
               <>
                 <form onSubmit={handleSubmit} className="space-y-4">

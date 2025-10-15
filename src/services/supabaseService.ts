@@ -183,6 +183,55 @@ class SupabaseService {
     return { error };
   }
 
+  async resendConfirmationEmail(email: string): Promise<{ error: any }> {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`
+      }
+    });
+    return { error };
+  }
+
+  parseAuthError(error: any): string {
+    if (!error) return "An unknown error occurred";
+    
+    const message = error.message || error.error_description || error.error || "";
+    
+    // Handle specific error cases with user-friendly messages
+    if (message.includes("Email rate limit exceeded")) {
+      return "Too many email requests. Please wait 60 seconds before trying again.";
+    }
+    
+    if (message.includes("Token has expired") || message.includes("token not found")) {
+      return "This verification link has expired. Please request a new one.";
+    }
+    
+    if (message.includes("Invalid login credentials")) {
+      return "Invalid email or password. Please check your credentials.";
+    }
+    
+    if (message.includes("Email not confirmed")) {
+      return "Please verify your email address before signing in. Check your inbox for the confirmation link.";
+    }
+    
+    if (message.includes("User already registered")) {
+      return "An account with this email already exists. Please sign in instead.";
+    }
+    
+    if (message.includes("Invalid redirect URL") || message.includes("redirect not allowed")) {
+      return "Authentication configuration error. Please contact support or check your Supabase settings.";
+    }
+    
+    if (message.includes("Password should be at least 6 characters")) {
+      return "Password must be at least 6 characters long.";
+    }
+    
+    // Return original message if no specific match
+    return message;
+  }
+
   // Profile management
   async getProfile(userId: string): Promise<{ profile: UserProfile | null; error: any }> {
     const { data, error } = await supabase
