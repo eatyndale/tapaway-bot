@@ -143,7 +143,7 @@ class SupabaseService {
         data: {
           first_name: firstName
         },
-        emailRedirectTo: 'https://tapaway.lovable.app/'
+        emailRedirectTo: 'https://tapaway.lovable.app/auth-callback'
       }
     });
 
@@ -188,7 +188,7 @@ class SupabaseService {
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: 'https://tapaway.lovable.app/'
+        emailRedirectTo: 'https://tapaway.lovable.app/auth-callback'
       }
     });
     return { error };
