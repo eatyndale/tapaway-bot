@@ -164,8 +164,6 @@ EXAMPLE RESPONSE at gathering-intensity (intensity received):
 - tapping-point (points 0-7): {"next_state":"tapping-point","tapping_point":N} (N=0 to 7)
 - tapping-point (point 7) → tapping-breathing: {"next_state":"tapping-breathing"}
 - tapping-breathing → post-tapping: {"next_state":"post-tapping"}
-- post-tapping → advice: {"next_state":"advice"} (when intensity is 0 or user wants to stop)
-- post-tapping → tapping-point (point 0): {"next_state":"tapping-point","tapping_point":0,"setup_statements":[...],"statement_order":[...]} (when intensity > 0, continue tapping)
 
 NEVER FORGET THE DIRECTIVE. IT MUST BE IN EVERY SINGLE RESPONSE.
 `;
@@ -301,84 +299,11 @@ Intensity: ${sessionContext.currentIntensity || sessionContext.initialIntensity 
 - Check if they want to continue or are ready to rate their intensity`;
         break;
       case 'post-tapping':
-        // Check if we're collecting the intensity rating or deciding next steps
-        const hasNewIntensity = sessionContext?.currentIntensity !== undefined && 
-                                sessionContext.currentIntensity !== sessionContext.initialIntensity;
-        
-        if (!hasNewIntensity) {
-          // First time in post-tapping - ask for rating
-          systemPrompt += `
-**CURRENT STATE: post-tapping (awaiting intensity rating)**
-
-The user just finished a tapping round.
-
-**YOUR RESPONSE:**
-"Take a deep breath in and breathe out, ${userName}. How are you feeling now? Can you rate that ${sessionContext?.feeling || 'feeling'} in your ${sessionContext?.bodyLocation || 'body'} again on the scale of 0-10?"
-
-**DIRECTIVE:**
-<<DIRECTIVE {"next_state":"post-tapping","collect":"intensity"}>>
-`;
-        } else {
-          // We have the new intensity - make a decision
-          const currentIntensity = sessionContext.currentIntensity || 0;
-          const initialIntensity = sessionContext.initialIntensity || 10;
-          const improvement = initialIntensity - currentIntensity;
-          
-          if (currentIntensity === 0) {
-            // Perfect! Go to advice
-            systemPrompt += `
-**CURRENT STATE: post-tapping (intensity now 0)**
-
-Current intensity: ${currentIntensity}/10 (was ${initialIntensity}/10)
-Improvement: ${improvement} points 🎉
-
-**YOUR RESPONSE:**
-"Wonderful, ${userName}! You've completely released that ${sessionContext.feeling || 'feeling'}. You've done amazing work here today!"
-
-**DIRECTIVE:**
-<<DIRECTIVE {"next_state":"advice"}>>
-`;
-          } else if (currentIntensity <= 2) {
-            // Very low - offer choice
-            systemPrompt += `
-**CURRENT STATE: post-tapping (intensity very low)**
-
-Current intensity: ${currentIntensity}/10 (was ${initialIntensity}/10)
-Improvement: ${improvement} points
-
-**YOUR RESPONSE:**
-"Great progress, ${userName}! You've brought it down to ${currentIntensity}/10. That's excellent! Would you like to do another round of tapping to bring it even lower, or are you ready to finish for now?"
-
-**WAIT FOR USER RESPONSE.**
-
-**If they want to continue, respond:**
-"Perfect! Let's do another round. Take a deep breath in... and breathe out. Let's begin the tapping now."
-
-**DIRECTIVE (for continuing):**
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I still feel this ${sessionContext.feeling || 'feeling'} at ${currentIntensity}/10 in my ${sessionContext.bodyLocation || 'body'}, I deeply accept myself","This remaining ${sessionContext.feeling || 'feeling'} in my ${sessionContext.bodyLocation || 'body'}, I choose to release it completely","Even with this ${currentIntensity}/10 ${sessionContext.feeling || 'feeling'}, I'm doing great and I can let it go"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
-
-**If they want to stop, respond:**
-"That's completely okay, ${userName}. You've made wonderful progress today!"
-
-**DIRECTIVE (for stopping):**
-<<DIRECTIVE {"next_state":"advice"}>>
-`;
-          } else {
-            // Still significant intensity - recommend another round
-            systemPrompt += `
-**CURRENT STATE: post-tapping (intensity still significant)**
-
-Current intensity: ${currentIntensity}/10 (was ${initialIntensity}/10)
-Improvement: ${improvement} points
-
-**YOUR RESPONSE:**
-"Good work, ${userName}. You've reduced it from ${initialIntensity}/10 to ${currentIntensity}/10. Let's do another round of tapping to bring it down even more. Take a deep breath in... and breathe out. Let's begin the tapping now."
-
-**DIRECTIVE (for starting new round):**
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I still feel this ${sessionContext.feeling || 'feeling'} at ${currentIntensity}/10 in my ${sessionContext.bodyLocation || 'body'}, I deeply accept myself","This remaining ${sessionContext.feeling || 'feeling'} in my ${sessionContext.bodyLocation || 'body'}, I choose to release it now","Even with this ${currentIntensity}/10 ${sessionContext.feeling || 'feeling'}, I'm making progress"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
-`;
-          }
-        }
+        systemPrompt += `
+- Say: "Take a deep breath in and breathe out, ${userName}. How are you feeling now?"
+- Ask them to re-rate their intensity: "Can you rate that feeling again on the scale of 0-10?"
+- DO NOT create new statements yet - wait for their rating first
+- Keep response focused only on getting the new intensity rating`;
         break;
       case 'advice':
         systemPrompt += `
@@ -433,13 +358,7 @@ After point 7 (move to breathing):
 <<DIRECTIVE {"next_state":"tapping-breathing","tapping_point":null,"say_index":null,"collect":"intensity","notes":"completed round"}>>
 
 Gathering feeling:
-<<DIRECTIVE {"next_state":"gathering-location","tapping_point":null,"say_index":null,"collect":"body_location","notes":""}>>
-
-Post-tapping decision (intensity = 0, go to advice):
-<<DIRECTIVE {"next_state":"advice","collect":null,"notes":"completed session"}>>
-
-Post-tapping decision (intensity > 0, continue tapping):
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I still feel this anxiety at 4/10 in my chest, I deeply accept myself","This remaining anxiety in my chest, I choose to release it now","Even with this 4/10 anxiety, I'm making progress"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0,"collect":null,"notes":"starting new round"}>>` },
+<<DIRECTIVE {"next_state":"gathering-location","tapping_point":null,"say_index":null,"collect":"body_location","notes":""}>>` },
       // Enhanced conversation history with more context
       ...conversationHistory.slice(-20).map((msg: any) => ({
         role: msg.type === 'user' ? 'user' : 'assistant',
