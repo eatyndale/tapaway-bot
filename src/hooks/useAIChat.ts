@@ -420,10 +420,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     // Reset tapping point to 0
     setCurrentTappingPoint(0);
     
-    // Transition to tapping-point state
-    onStateChange('tapping-point');
-    
-    // Add system message to show we're starting a new round
+    // Add system message to show we're starting a new round BEFORE state change
     const roundMessage: Message = {
       id: `round-${Date.now()}`,
       type: 'bot',
@@ -434,6 +431,12 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     
     setMessages(prev => [...prev, roundMessage]);
     setConversationHistory(prev => [...prev, roundMessage]);
+    
+    // Use setTimeout to ensure state updates have propagated
+    // This allows React to batch and complete all state updates first
+    setTimeout(() => {
+      onStateChange('tapping-point');
+    }, 0);
     
   }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate, setCurrentTappingPoint, setMessages, setConversationHistory]);
 
