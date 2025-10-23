@@ -423,6 +423,7 @@ const AIAnxietyBot = () => {
             <ChatHistory 
               chatHistory={chatHistory}
               onLoadSession={loadHistorySession}
+              onClose={() => setShowHistory(false)}
             />
           ) : (
             <SessionProgress session={{

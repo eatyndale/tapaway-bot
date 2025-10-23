@@ -1,22 +1,33 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { History } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { History, ArrowLeft } from "lucide-react";
 import { ChatSession as SupabaseChatSession } from "@/services/supabaseService";
 
 interface ChatHistoryProps {
   chatHistory: SupabaseChatSession[];
   onLoadSession: (session: SupabaseChatSession) => void;
+  onClose: () => void;
 }
 
-const ChatHistory = ({ chatHistory, onLoadSession }: ChatHistoryProps) => {
+const ChatHistory = ({ chatHistory, onLoadSession, onClose }: ChatHistoryProps) => {
   return (
     <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center">
           <History className="w-5 h-5 mr-2" />
           Chat History
         </CardTitle>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={onClose}
+          className="gap-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Session
+        </Button>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[400px]">
