@@ -386,56 +386,6 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     }
   }, [messages, userProfile, currentChatSession, sessionContext, conversationHistory, onStateChange, onSessionUpdate, onCrisisDetected]);
 
-  const handlePostTappingIntensity = useCallback(async (newIntensity: number) => {
-    console.log('[useAIChat] Post-tapping intensity received:', newIntensity);
-    console.log('[useAIChat] Initial intensity was:', sessionContext.initialIntensity);
-    
-    const initialIntensity = sessionContext.initialIntensity || 10;
-    const improvement = initialIntensity - newIntensity;
-    
-    // Decision logic based on intensity
-  if (newIntensity === 0) {
-    // Perfect! Go to advice
-    console.log('[useAIChat] Intensity is 0 - transitioning to advice');
-    
-    // First transition to advice state
-    onStateChange('advice');
-    
-    // Then request congratulatory message (now in 'advice' state, won't be intercepted)
-    await sendMessage(
-      `My intensity is now 0/10`,
-      'advice',
-      { currentIntensity: 0 }
-    );
-      
-    } else if (newIntensity <= 2) {
-      // Very low - offer user a choice
-      console.log('[useAIChat] Intensity is low (≤2) - offering choice');
-      
-      // Add a system message with choice buttons
-      const choiceMessage: Message = {
-        id: `choice-${Date.now()}`,
-        type: 'system',
-        content: JSON.stringify({
-          type: 'continue-choice',
-          intensity: newIntensity,
-          improvement: improvement
-        }),
-        timestamp: new Date(),
-        sessionId: currentChatSession
-      };
-      
-      setMessages(prev => [...prev, choiceMessage]);
-      
-  } else {
-    // Still significant - automatically start another round
-    console.log('[useAIChat] Intensity still high (>2) - starting new round');
-    
-    // Start new tapping round directly (it has its own message)
-    startNewTappingRound(newIntensity);
-  }
-  }, [sessionContext, currentChatSession, messages, onStateChange, sendMessage]);
-
   const startNewTappingRound = useCallback((currentIntensity: number) => {
     console.log('[useAIChat] Starting new tapping round with intensity:', currentIntensity);
     
@@ -486,6 +436,57 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     setConversationHistory(prev => [...prev, roundMessage]);
     
   }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate, setCurrentTappingPoint, setMessages, setConversationHistory]);
+
+  const handlePostTappingIntensity = useCallback(async (newIntensity: number) => {
+    console.log('[useAIChat] Post-tapping intensity received:', newIntensity);
+    console.log('[useAIChat] Initial intensity was:', sessionContext.initialIntensity);
+    
+    const initialIntensity = sessionContext.initialIntensity || 10;
+    const improvement = initialIntensity - newIntensity;
+    
+    // Decision logic based on intensity
+  if (newIntensity === 0) {
+    // Perfect! Go to advice
+    console.log('[useAIChat] Intensity is 0 - transitioning to advice');
+    
+    // First transition to advice state
+    onStateChange('advice');
+    
+    // Then request congratulatory message (now in 'advice' state, won't be intercepted)
+    await sendMessage(
+      `My intensity is now 0/10`,
+      'advice',
+      { currentIntensity: 0 }
+    );
+      
+    } else if (newIntensity <= 2) {
+      // Very low - offer user a choice
+      console.log('[useAIChat] Intensity is low (≤2) - offering choice');
+      
+      // Add a system message with choice buttons
+      const choiceMessage: Message = {
+        id: `choice-${Date.now()}`,
+        type: 'system',
+        content: JSON.stringify({
+          type: 'continue-choice',
+          intensity: newIntensity,
+          improvement: improvement
+        }),
+        timestamp: new Date(),
+        sessionId: currentChatSession
+      };
+      
+      setMessages(prev => [...prev, choiceMessage]);
+      setConversationHistory(prev => [...prev, choiceMessage]);
+      
+  } else {
+    // Still significant - automatically start another round
+    console.log('[useAIChat] Intensity still high (>2) - starting new round');
+    
+    // Start new tapping round directly (it has its own message)
+    startNewTappingRound(newIntensity);
+  }
+  }, [sessionContext, currentChatSession, messages, onStateChange, sendMessage, setConversationHistory, setMessages, startNewTappingRound]);
 
   const determineNextState = (currentState: ChatState, aiResponse: string): ChatState | null => {
     console.log('[determineNextState] FALLBACK LOGIC - Current state:', currentState);
