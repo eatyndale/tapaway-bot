@@ -619,6 +619,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           setMessages([]);
           setConversationHistory([]);
           setSessionContext({});
+          setIntensityHistory([]);
+          setCurrentTappingPoint(0);
+          setCrisisDetected(false);
+          onStateChange('initial');
           
           // Add initial greeting
           createInitialGreeting(session.id);
