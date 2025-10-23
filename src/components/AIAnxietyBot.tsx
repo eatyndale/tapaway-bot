@@ -19,6 +19,8 @@ import ChatInput from "./anxiety-bot/ChatInput";
 import SessionActions from "./anxiety-bot/SessionActions";
 import ChatHeader from "./anxiety-bot/ChatHeader";
 import QuestionnaireView from "./anxiety-bot/QuestionnaireView";
+import AdviceDisplay from "./anxiety-bot/AdviceDisplay";
+import SessionComplete from "./anxiety-bot/SessionComplete";
 
 
 const AIAnxietyBot = () => {
@@ -369,7 +371,7 @@ const AIAnxietyBot = () => {
             <CardContent>
               <ScrollArea className="h-[500px] mb-4">
                 <div className="space-y-4">
-                  {messages.map((message) => {
+                  {messages.map((message, index) => {
                     // Check if this is a choice message
                     if (message.type === 'system') {
                       try {
@@ -406,9 +408,46 @@ const AIAnxietyBot = () => {
                       }
                     }
                     
+                    // Check if this is the LAST bot message AND we're in advice state
+                    const isLastBotMessage = message.type === 'bot' && index === messages.length - 1;
+                    
+                    if (isLastBotMessage && chatState === 'advice') {
+                      return (
+                        <AdviceDisplay 
+                          key={message.id}
+                          session={{
+                            id: '',
+                            timestamp: new Date(),
+                            problem: sessionContext.problem || '',
+                            feeling: sessionContext.feeling || '',
+                            bodyLocation: sessionContext.bodyLocation || '',
+                            initialIntensity: sessionContext.initialIntensity || 0,
+                            currentIntensity: sessionContext.currentIntensity || 0,
+                            round: sessionContext.round || 0,
+                            setupStatements: sessionContext.setupStatements || [],
+                            reminderPhrases: sessionContext.reminderPhrases || [],
+                            isComplete: false
+                          }}
+                          adviceText={message.content}
+                          onComplete={() => {
+                            console.log('Advice complete, transitioning to complete state');
+                            setChatState('complete');
+                          }}
+                        />
+                      );
+                    }
+                    
                     return <ChatMessage key={message.id} message={message} />;
                   })}
                   {isLoading && <LoadingIndicator />}
+                  
+                  {/* Show SessionComplete component after all messages when state is complete */}
+                  {chatState === 'complete' && (
+                    <SessionComplete 
+                      onNewSession={startNewSession}
+                      onViewHistory={() => setShowHistory(true)}
+                    />
+                  )}
                 </div>
               </ScrollArea>
               

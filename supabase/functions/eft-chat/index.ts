@@ -322,35 +322,67 @@ Note: The frontend will decide whether to continue tapping, offer a choice, or m
         const initialIntensity = sessionContext.initialIntensity || 10;
         const finalIntensity = sessionContext.currentIntensity || 0;
         const improvement = initialIntensity - finalIntensity;
+        const improvementPercentage = initialIntensity 
+          ? Math.round((improvement / initialIntensity) * 100) 
+          : 0;
         
         systemPrompt += `
 **CURRENT STATE: advice**
 
-The user has completed their tapping session. Provide warm, personalized advice.
+The user has completed their tapping session. Generate personalized advice based on their results.
 
 **Session Summary:**
-- Problem: ${sessionContext.problem || 'their concern'}
-- Emotion: ${sessionContext.feeling || 'the feeling'}
+- Problem: "${sessionContext.problem}"
+- Emotion: "${sessionContext.feeling}"
+- Body location: "${sessionContext.bodyLocation}"
 - Initial intensity: ${initialIntensity}/10
 - Final intensity: ${finalIntensity}/10
-- Improvement: ${improvement} points
+- Improvement: ${improvement} points (${improvementPercentage}%)
+- Rounds completed: ${sessionContext.round || 1}
 
-**YOUR RESPONSE STRUCTURE:**
+**Advice Generation Guidelines:**
 
-1. **Congratulate them warmly:**
-   "You've done amazing work today, ${userName}! You brought your ${sessionContext.feeling || 'feeling'} down from ${initialIntensity}/10 to ${finalIntensity}/10 - that's incredible progress!"
+Generate 4-6 personalized bullet points based on the outcome tier:
 
-2. **Personalized advice for maintaining improvement:**
-   - Suggest specific times to tap for ${sessionContext.feeling || 'this feeling'} about ${sessionContext.problem || 'this concern'}
-   - Recommend tapping on ${sessionContext.bodyLocation || 'the body location'} whenever they notice tension
-   - Encourage daily 2-minute check-ins with themselves
+${finalIntensity === 0 ? `
+**TIER: Complete Relief (0/10)**
+- Start with celebration emoji and acknowledgment of achievement
+- Provide maintenance strategies (practice the same sequence when similar feelings arise)
+- Suggest daily preventive practice (5-minute morning sessions)
+- Recommend journaling to track triggers and patterns
+- Encourage sharing progress with trusted support network
+` : improvementPercentage >= 70 ? `
+**TIER: Excellent Progress (70%+ improvement)**
+- Acknowledge the significant progress with celebration emoji (from ${initialIntensity} to ${finalIntensity})
+- Suggest continuing with another session in 2-3 hours
+- Recommend complementary breathing exercises throughout the day
+- Emphasize building the habit for increasing effectiveness
+- Note that remaining intensity can likely be reduced further
+` : improvementPercentage >= 40 ? `
+**TIER: Good Progress (40-69% improvement)**
+- Recognize the positive progress with supportive emoji (from ${initialIntensity} to ${finalIntensity})
+- Encourage patience with the healing process
+- Suggest exploring underlying connected concerns
+- Emphasize self-compassion and that healing takes time
+- Recommend professional support if anxiety persists
+` : `
+**TIER: Some Progress (<40% improvement)**
+- Validate that every step counts with encouraging emoji (reduced from ${initialIntensity} to ${finalIntensity})
+- Suggest trying different tapping approaches or phrases
+- Recommend considering professional therapeutic support
+- Encourage reaching out to support network
+- Suggest exploring additional EFT resources and guided sessions
+- If severe, recommend consulting healthcare provider
+`}
 
-3. **Encourage ongoing practice:**
-   "I'm here whenever you need support. Remember, you have the power to manage these feelings."
+**Format Requirements:**
+- Each bullet point should start with an emoji (🎉, 💡, 🌱, 📝, 🤝, ✨, 🔄, ⏰, 🧘, 💪, 👍, 🎯, 🔍, 🤲, 📞, 🌟, 🔬, 🏥, 👥, 📚, ⚕️)
+- Use warm, encouraging, supportive tone
+- Reference the user's specific problem ("${sessionContext.problem}"), emotion ("${sessionContext.feeling}"), and body location ("${sessionContext.bodyLocation}") naturally in the advice
+- Include concrete numbers when discussing improvement (${initialIntensity}/10 → ${finalIntensity}/10)
+- Keep each point concise but meaningful (1-2 sentences max per point)
 
-Keep it warm, encouraging, and actionable. Use 2-3 paragraphs. Then transition to complete.
-
-**DIRECTIVE:**
+After providing the advice, you MUST include this exact directive:
 <<DIRECTIVE {"next_state":"complete"}>>
 `;
         break;

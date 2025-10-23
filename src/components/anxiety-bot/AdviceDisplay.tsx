@@ -5,11 +5,13 @@ import { ChatSession } from "./types";
 
 interface AdviceDisplayProps {
   session: ChatSession;
+  adviceText?: string; // AI-generated advice content (optional, will generate if not provided)
   onComplete: () => void;
 }
 
-const AdviceDisplay = ({ session, onComplete }: AdviceDisplayProps) => {
-  const generateAdvice = (session: ChatSession) => {
+const AdviceDisplay = ({ session, adviceText, onComplete }: AdviceDisplayProps) => {
+  // Generate advice locally if not provided (for non-AI mode)
+  const generateAdvice = (session: ChatSession): string[] => {
     const improvement = session.initialIntensity - session.currentIntensity;
     const improvementPercentage = Math.round((improvement / session.initialIntensity) * 100);
     
@@ -53,7 +55,22 @@ const AdviceDisplay = ({ session, onComplete }: AdviceDisplayProps) => {
     return advice;
   };
 
-  const advice = generateAdvice(session);
+  // Parse the AI-generated advice text into individual bullet points
+  const parseAdvice = (text: string): string[] => {
+    // Split by newlines and filter out empty lines
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    
+    // Filter for lines that are bullet points (start with emoji, -, *, •, or numbers)
+    const bullets = lines.filter(line => {
+      const trimmed = line.trim();
+      return /^[\p{Emoji}\-\*•\d]/u.test(trimmed);
+    });
+    
+    return bullets.length > 0 ? bullets : [text]; // Fallback to full text if no bullets detected
+  };
+
+  // Use AI-generated advice if provided, otherwise generate locally
+  const advice = adviceText ? parseAdvice(adviceText) : generateAdvice(session);
 
   return (
     <div className="space-y-4">
