@@ -46,7 +46,9 @@ const AIAnxietyBot = () => {
     crisisDetected,
     currentTappingPoint,
     setCurrentTappingPoint,
-    intensityHistory
+    intensityHistory,
+    startNewTappingRound,
+    handlePostTappingIntensity
   } = useAIChat({
     onStateChange: (newState) => {
       console.log('State change:', chatState, '->', newState);
@@ -162,6 +164,23 @@ const AIAnxietyBot = () => {
   const handleTappingComplete = () => {
     setIsTapping(false);
     setChatState('post-tapping');
+  };
+
+  const handleContinueTapping = (intensity: number) => {
+    console.log('[AIAnxietyBot] User chose to continue tapping');
+    startNewTappingRound(intensity);
+  };
+
+  const handleEndSession = async () => {
+    console.log('[AIAnxietyBot] User chose to end session');
+    setChatState('advice');
+    
+    // Request closing message from AI
+    await sendMessage(
+      `I'm ready to finish for now`,
+      'post-tapping',
+      { currentIntensity: sessionContext.currentIntensity }
+    );
   };
 
 
@@ -338,9 +357,45 @@ const AIAnxietyBot = () => {
             <CardContent>
               <ScrollArea className="h-[500px] mb-4">
                 <div className="space-y-4">
-                  {messages.map((message) => (
-                    <ChatMessage key={message.id} message={message} />
-                  ))}
+                  {messages.map((message) => {
+                    // Check if this is a choice message
+                    if (message.type === 'system') {
+                      try {
+                        const parsed = JSON.parse(message.content);
+                        if (parsed.type === 'continue-choice') {
+                          return (
+                            <div key={message.id} className="space-y-3 p-4 bg-secondary/20 rounded-lg">
+                              <p className="text-sm font-medium">
+                                Great progress! You've reduced your intensity from {sessionContext.initialIntensity}/10 to {parsed.intensity}/10.
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Would you like to continue tapping to bring it even lower?
+                              </p>
+                              <div className="flex gap-2">
+                                <Button 
+                                  onClick={() => handleContinueTapping(parsed.intensity)}
+                                  size="sm"
+                                >
+                                  Yes, Continue Tapping
+                                </Button>
+                                <Button 
+                                  onClick={handleEndSession}
+                                  size="sm"
+                                  variant="outline"
+                                >
+                                  No, I'm Ready to Finish
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        }
+                      } catch (e) {
+                        // Not a JSON message, render normally
+                      }
+                    }
+                    
+                    return <ChatMessage key={message.id} message={message} />;
+                  })}
                   {isLoading && <LoadingIndicator />}
                 </div>
               </ScrollArea>

@@ -300,10 +300,23 @@ Intensity: ${sessionContext.currentIntensity || sessionContext.initialIntensity 
         break;
       case 'post-tapping':
         systemPrompt += `
-- Say: "Take a deep breath in and breathe out, ${userName}. How are you feeling now?"
-- Ask them to re-rate their intensity: "Can you rate that feeling again on the scale of 0-10?"
-- DO NOT create new statements yet - wait for their rating first
-- Keep response focused only on getting the new intensity rating`;
+**CURRENT STATE: post-tapping**
+
+The user just completed a tapping round. They will now rate their intensity.
+
+Previous intensity: ${sessionContext.initialIntensity || 'N/A'}/10
+Current intensity: ${sessionContext.currentIntensity || 'N/A'}/10
+
+**YOUR RESPONSE (just ask for the rating):**
+"Take a deep breath in and breathe out, ${userName}. How are you feeling now? Can you rate that ${sessionContext.feeling || 'feeling'} in your ${sessionContext.bodyLocation || 'body'} again on the scale of 0-10?"
+
+**IMPORTANT:** The frontend will handle the decision of what to do next based on the intensity. You ONLY need to ask for the rating and provide emotional support.
+
+**DIRECTIVE:**
+<<DIRECTIVE {"next_state":"post-tapping","collect":"intensity"}>>
+
+Note: The frontend will decide whether to continue tapping, offer a choice, or move to advice based on the intensity value.
+`;
         break;
       case 'advice':
         systemPrompt += `

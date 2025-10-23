@@ -26,6 +26,12 @@ const SessionProgress = ({ session }: SessionProgressProps) => {
                 <p className="text-gray-800 text-sm">{session.feeling} in {session.bodyLocation}</p>
               </div>
             )}
+            {session.round > 1 && (
+              <div>
+                <p className="text-sm font-medium text-gray-600">Round</p>
+                <p className="text-xl font-bold text-[#94c11f]">{session.round}</p>
+              </div>
+            )}
             {session.round > 0 && (
               <>
                 <div>

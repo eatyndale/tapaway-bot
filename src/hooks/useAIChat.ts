@@ -197,6 +197,35 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
 
     // Update session context with intensity tracking
     const updatedContext = { ...sessionContext, ...additionalContext };
+
+    // NEW: Intercept post-tapping intensity submission
+    if (chatState === 'post-tapping' && additionalContext?.currentIntensity !== undefined) {
+      console.log('[useAIChat] Post-tapping intensity detected - frontend will handle decision');
+      
+      // Update session context
+      setSessionContext(updatedContext);
+      onSessionUpdate(updatedContext);
+      
+      // Track intensity
+      const newHistory = [...intensityHistory, additionalContext.currentIntensity];
+      setIntensityHistory(newHistory);
+      
+      // Add user message
+      const userMsg: Message = {
+        id: `user-${Date.now()}`,
+        type: 'user',
+        content: userMessage,
+        timestamp: new Date(),
+        sessionId: currentChatSession
+      };
+      setMessages(prev => [...prev, userMsg]);
+      
+      // Frontend handles the decision (don't call AI yet)
+      await handlePostTappingIntensity(additionalContext.currentIntensity);
+      
+      setIsLoading(false);
+      return; // Exit early - frontend is in control now
+    }
     
     // Track intensity changes
     if (additionalContext?.currentIntensity !== undefined) {
@@ -357,6 +386,114 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     }
   }, [messages, userProfile, currentChatSession, sessionContext, conversationHistory, onStateChange, onSessionUpdate, onCrisisDetected]);
 
+  const handlePostTappingIntensity = useCallback(async (newIntensity: number) => {
+    console.log('[useAIChat] Post-tapping intensity received:', newIntensity);
+    console.log('[useAIChat] Initial intensity was:', sessionContext.initialIntensity);
+    
+    const initialIntensity = sessionContext.initialIntensity || 10;
+    const improvement = initialIntensity - newIntensity;
+    
+    // Decision logic based on intensity
+    if (newIntensity === 0) {
+      // Perfect! Go to advice
+      console.log('[useAIChat] Intensity is 0 - transitioning to advice');
+      
+      // Request congratulatory message from AI
+      await sendMessage(
+        `My intensity is now 0/10`,
+        'post-tapping',
+        { currentIntensity: 0 }
+      );
+      
+      // Frontend controls the state transition
+      onStateChange('advice');
+      
+    } else if (newIntensity <= 2) {
+      // Very low - offer user a choice
+      console.log('[useAIChat] Intensity is low (≤2) - offering choice');
+      
+      // Add a system message with choice buttons
+      const choiceMessage: Message = {
+        id: `choice-${Date.now()}`,
+        type: 'system',
+        content: JSON.stringify({
+          type: 'continue-choice',
+          intensity: newIntensity,
+          improvement: improvement
+        }),
+        timestamp: new Date(),
+        sessionId: currentChatSession
+      };
+      
+      setMessages(prev => [...prev, choiceMessage]);
+      
+    } else {
+      // Still significant - automatically start another round
+      console.log('[useAIChat] Intensity still high (>2) - starting new round');
+      
+      // Request encouragement message from AI
+      await sendMessage(
+        `My intensity is now ${newIntensity}/10`,
+        'post-tapping',
+        { currentIntensity: newIntensity }
+      );
+      
+      // Start new tapping round (frontend controlled)
+      startNewTappingRound(newIntensity);
+    }
+  }, [sessionContext, currentChatSession, messages, onStateChange, sendMessage]);
+
+  const startNewTappingRound = useCallback((currentIntensity: number) => {
+    console.log('[useAIChat] Starting new tapping round with intensity:', currentIntensity);
+    
+    // Generate new setup statements based on current intensity
+    const feeling = sessionContext.feeling || 'this feeling';
+    const bodyLocation = sessionContext.bodyLocation || 'my body';
+    const problem = sessionContext.problem || 'this issue';
+    
+    const newSetupStatements = [
+      `Even though I still feel ${feeling} at ${currentIntensity}/10 in ${bodyLocation}, I deeply accept myself`,
+      `This remaining ${feeling} in ${bodyLocation}, I choose to release it completely`,
+      `Even with this ${currentIntensity}/10 ${feeling}, I'm making progress and I can let it go`
+    ];
+    
+    const statementOrder = [0, 1, 2, 0, 1, 2, 1, 0]; // Standard order
+    
+    // Increment round number
+    const newRound = (sessionContext.round || 1) + 1;
+    
+    // Update session context
+    const updatedContext = {
+      ...sessionContext,
+      currentIntensity: currentIntensity,
+      round: newRound,
+      setupStatements: newSetupStatements,
+      statementOrder: statementOrder
+    };
+    
+    setSessionContext(updatedContext);
+    onSessionUpdate(updatedContext);
+    
+    // Reset tapping point to 0
+    setCurrentTappingPoint(0);
+    
+    // Transition to tapping-point state
+    onStateChange('tapping-point');
+    
+    // Add system message to show we're starting a new round
+    const roundMessage: Message = {
+      id: `round-${Date.now()}`,
+      type: 'bot',
+      content: `Let's do another round of tapping to bring that ${feeling} down even more. Take a deep breath...`,
+      timestamp: new Date(),
+      sessionId: currentChatSession
+    };
+    
+    setMessages(prev => [...prev, roundMessage]);
+    setConversationHistory(prev => [...prev, roundMessage]);
+    
+  }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate, setCurrentTappingPoint]);
+
   const determineNextState = (currentState: ChatState, aiResponse: string): ChatState | null => {
     console.log('[determineNextState] FALLBACK LOGIC - Current state:', currentState);
     console.log('[determineNextState] AI response preview:', aiResponse.substring(0, 150));
@@ -467,6 +604,8 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     crisisDetected,
     currentTappingPoint,
     setCurrentTappingPoint,
-    intensityHistory
+    intensityHistory,
+    startNewTappingRound,
+    handlePostTappingIntensity
   };
 };
