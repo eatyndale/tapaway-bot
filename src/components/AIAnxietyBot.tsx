@@ -48,7 +48,8 @@ const AIAnxietyBot = () => {
     setCurrentTappingPoint,
     intensityHistory,
     startNewTappingRound,
-    handlePostTappingIntensity
+    handlePostTappingIntensity,
+    completeTappingSession
   } = useAIChat({
     onStateChange: (newState) => {
       console.log('State change:', chatState, '->', newState);
@@ -174,19 +175,26 @@ const AIAnxietyBot = () => {
     // Don't set state here - let TappingGuide's onComplete handle transition to tapping-breathing
   };
 
-  const handleContinueTapping = (intensity: number) => {
+  const handleContinueTapping = async (intensity: number) => {
     console.log('[AIAnxietyBot] User chose to continue tapping');
-    startNewTappingRound(intensity);
+    await startNewTappingRound(intensity);
   };
 
   const handleEndSession = async () => {
     console.log('[AIAnxietyBot] User chose to end session');
+    
+    // First, save tapping session data
+    if (sessionContext.currentIntensity !== undefined) {
+      await completeTappingSession(sessionContext.currentIntensity);
+    }
+    
+    // Transition to advice state
     setChatState('advice');
     
-    // Request closing message from AI
+    // Request advice from AI (with state='advice', won't be intercepted)
     await sendMessage(
-      `I'm ready to finish for now`,
-      'post-tapping',
+      `I'm ready to finish. My final intensity is ${sessionContext.currentIntensity}/10. Initial was ${sessionContext.initialIntensity}/10.`,
+      'advice',
       { currentIntensity: sessionContext.currentIntensity }
     );
   };
@@ -307,13 +315,9 @@ const AIAnxietyBot = () => {
     }
 
 
+    // When advice or complete, hide input area - header buttons handle actions
     if (chatState === 'advice' || chatState === 'complete') {
-      return (
-        <SessionActions 
-          onStartNewSession={startNewSession}
-          onShowHistory={() => setShowHistory(true)}
-        />
-      );
+      return null;
     }
 
     return (

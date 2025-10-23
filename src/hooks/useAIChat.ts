@@ -15,6 +15,7 @@ interface SessionContext {
   setupStatements?: string[];
   reminderPhrases?: string[];
   statementOrder?: number[];
+  tappingSessionId?: string;
 }
 
 interface Directive {
@@ -233,6 +234,23 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       setIntensityHistory(newHistory);
     }
     
+    // Create tapping session when initial intensity is collected
+    if (chatState === 'gathering-intensity' && additionalContext?.initialIntensity) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && updatedContext.problem && updatedContext.feeling && updatedContext.bodyLocation) {
+        const { session: tappingSession } = await supabaseService.createTappingSession(user.id, {
+          problem: updatedContext.problem,
+          feeling: updatedContext.feeling,
+          body_location: updatedContext.bodyLocation,
+          initial_intensity: additionalContext.initialIntensity
+        });
+        if (tappingSession) {
+          updatedContext.tappingSessionId = tappingSession.id;
+          updatedContext.round = 1;
+        }
+      }
+    }
+    
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);
 
@@ -386,7 +404,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     }
   }, [messages, userProfile, currentChatSession, sessionContext, conversationHistory, onStateChange, onSessionUpdate, onCrisisDetected]);
 
-  const startNewTappingRound = useCallback((currentIntensity: number) => {
+  const startNewTappingRound = useCallback(async (currentIntensity: number) => {
     console.log('[useAIChat] Starting new tapping round with intensity:', currentIntensity);
     
     // Generate new setup statements based on current intensity
@@ -417,6 +435,14 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);
     
+    // Update tapping session with new round count
+    if (updatedContext.tappingSessionId) {
+      await supabaseService.updateTappingSession(updatedContext.tappingSessionId, {
+        rounds_completed: newRound,
+        final_intensity: currentIntensity
+      });
+    }
+    
     // Reset tapping point to 0
     setCurrentTappingPoint(0);
     
@@ -440,6 +466,16 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     
   }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate, setCurrentTappingPoint, setMessages, setConversationHistory]);
 
+  const completeTappingSession = useCallback(async (finalIntensity: number) => {
+    if (sessionContext.tappingSessionId) {
+      await supabaseService.updateTappingSession(sessionContext.tappingSessionId, {
+        final_intensity: finalIntensity,
+        rounds_completed: sessionContext.round || 1,
+        completed_at: new Date().toISOString()
+      });
+    }
+  }, [sessionContext]);
+
   const handlePostTappingIntensity = useCallback(async (newIntensity: number) => {
     console.log('[useAIChat] Post-tapping intensity received:', newIntensity);
     console.log('[useAIChat] Initial intensity was:', sessionContext.initialIntensity);
@@ -448,19 +484,21 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     const improvement = initialIntensity - newIntensity;
     
     // Decision logic based on intensity
-  if (newIntensity === 0) {
-    // Perfect! Go to advice
-    console.log('[useAIChat] Intensity is 0 - transitioning to advice');
-    
-    // First transition to advice state
-    onStateChange('advice');
-    
-    // Then request congratulatory message (now in 'advice' state, won't be intercepted)
-    await sendMessage(
-      `My intensity is now 0/10`,
-      'advice',
-      { currentIntensity: 0 }
-    );
+    if (newIntensity === 0) {
+      // Perfect! Complete session and go to advice
+      console.log('[useAIChat] Intensity is 0 - completing session and transitioning to advice');
+      
+      await completeTappingSession(newIntensity);
+      
+      // First transition to advice state
+      onStateChange('advice');
+      
+      // Then request advice from AI (now in 'advice' state, won't be intercepted)
+      await sendMessage(
+        `My intensity is now 0/10. Initial was ${initialIntensity}/10.`,
+        'advice',
+        { currentIntensity: 0 }
+      );
       
     } else if (newIntensity <= 2) {
       // Very low - offer user a choice
@@ -603,6 +641,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     setCurrentTappingPoint,
     intensityHistory,
     startNewTappingRound,
-    handlePostTappingIntensity
+    handlePostTappingIntensity,
+    completeTappingSession
   };
 };

@@ -319,11 +319,40 @@ Note: The frontend will decide whether to continue tapping, offer a choice, or m
 `;
         break;
       case 'advice':
+        const initialIntensity = sessionContext.initialIntensity || 10;
+        const finalIntensity = sessionContext.currentIntensity || 0;
+        const improvement = initialIntensity - finalIntensity;
+        
         systemPrompt += `
-- Acknowledge their transformation: "You have done AMAZING work here today ${userName}"
-- Suggest: "For now, why don't you head over to the meditation library and do one of the meditations? I think you'd really benefit"
-- Offer ongoing support: "I am here whenever you need me"
-- Encourage daily practice for lasting results`;
+**CURRENT STATE: advice**
+
+The user has completed their tapping session. Provide warm, personalized advice.
+
+**Session Summary:**
+- Problem: ${sessionContext.problem || 'their concern'}
+- Emotion: ${sessionContext.feeling || 'the feeling'}
+- Initial intensity: ${initialIntensity}/10
+- Final intensity: ${finalIntensity}/10
+- Improvement: ${improvement} points
+
+**YOUR RESPONSE STRUCTURE:**
+
+1. **Congratulate them warmly:**
+   "You've done amazing work today, ${userName}! You brought your ${sessionContext.feeling || 'feeling'} down from ${initialIntensity}/10 to ${finalIntensity}/10 - that's incredible progress!"
+
+2. **Personalized advice for maintaining improvement:**
+   - Suggest specific times to tap for ${sessionContext.feeling || 'this feeling'} about ${sessionContext.problem || 'this concern'}
+   - Recommend tapping on ${sessionContext.bodyLocation || 'the body location'} whenever they notice tension
+   - Encourage daily 2-minute check-ins with themselves
+
+3. **Encourage ongoing practice:**
+   "I'm here whenever you need support. Remember, you have the power to manage these feelings."
+
+Keep it warm, encouraging, and actionable. Use 2-3 paragraphs. Then transition to complete.
+
+**DIRECTIVE:**
+<<DIRECTIVE {"next_state":"complete"}>>
+`;
         break;
     }
 
