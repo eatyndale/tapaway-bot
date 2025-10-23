@@ -112,7 +112,15 @@ const AIAnxietyBot = () => {
   };
 
   const handleSubmit = async () => {
-    if (!currentInput.trim() && !['gathering-intensity', 'post-tapping'].includes(chatState)) return;
+    if (!currentInput.trim() && !['gathering-intensity', 'post-tapping', 'tapping-breathing'].includes(chatState)) return;
+
+    // Special handling for tapping-breathing state - call handlePostTappingIntensity directly
+    if (chatState === 'tapping-breathing') {
+      const intensity = currentIntensity[0];
+      console.log('[AIAnxietyBot] Tapping-breathing intensity submitted:', intensity);
+      await handlePostTappingIntensity(intensity);
+      return;
+    }
 
     let messageToSend = currentInput;
     let additionalContext: any = {};
@@ -163,7 +171,7 @@ const AIAnxietyBot = () => {
 
   const handleTappingComplete = () => {
     setIsTapping(false);
-    setChatState('post-tapping');
+    // Don't set state here - let TappingGuide's onComplete handle transition to tapping-breathing
   };
 
   const handleContinueTapping = (intensity: number) => {

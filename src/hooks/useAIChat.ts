@@ -198,9 +198,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     // Update session context with intensity tracking
     const updatedContext = { ...sessionContext, ...additionalContext };
 
-    // NEW: Intercept post-tapping intensity submission
-    if (chatState === 'post-tapping' && additionalContext?.currentIntensity !== undefined) {
-      console.log('[useAIChat] Post-tapping intensity detected - frontend will handle decision');
+    // NEW: Intercept post-tapping or tapping-breathing intensity submission
+    if ((chatState === 'post-tapping' || chatState === 'tapping-breathing') && additionalContext?.currentIntensity !== undefined) {
+      console.log('[useAIChat] Post-tapping/breathing intensity detected - frontend will handle decision');
       
       // Update session context
       setSessionContext(updatedContext);
