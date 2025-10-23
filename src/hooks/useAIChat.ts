@@ -394,19 +394,19 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     const improvement = initialIntensity - newIntensity;
     
     // Decision logic based on intensity
-    if (newIntensity === 0) {
-      // Perfect! Go to advice
-      console.log('[useAIChat] Intensity is 0 - transitioning to advice');
-      
-      // Request congratulatory message from AI
-      await sendMessage(
-        `My intensity is now 0/10`,
-        'post-tapping',
-        { currentIntensity: 0 }
-      );
-      
-      // Frontend controls the state transition
-      onStateChange('advice');
+  if (newIntensity === 0) {
+    // Perfect! Go to advice
+    console.log('[useAIChat] Intensity is 0 - transitioning to advice');
+    
+    // First transition to advice state
+    onStateChange('advice');
+    
+    // Then request congratulatory message (now in 'advice' state, won't be intercepted)
+    await sendMessage(
+      `My intensity is now 0/10`,
+      'advice',
+      { currentIntensity: 0 }
+    );
       
     } else if (newIntensity <= 2) {
       // Very low - offer user a choice
@@ -427,20 +427,13 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       
       setMessages(prev => [...prev, choiceMessage]);
       
-    } else {
-      // Still significant - automatically start another round
-      console.log('[useAIChat] Intensity still high (>2) - starting new round');
-      
-      // Request encouragement message from AI
-      await sendMessage(
-        `My intensity is now ${newIntensity}/10`,
-        'post-tapping',
-        { currentIntensity: newIntensity }
-      );
-      
-      // Start new tapping round (frontend controlled)
-      startNewTappingRound(newIntensity);
-    }
+  } else {
+    // Still significant - automatically start another round
+    console.log('[useAIChat] Intensity still high (>2) - starting new round');
+    
+    // Start new tapping round directly (it has its own message)
+    startNewTappingRound(newIntensity);
+  }
   }, [sessionContext, currentChatSession, messages, onStateChange, sendMessage]);
 
   const startNewTappingRound = useCallback((currentIntensity: number) => {
@@ -492,7 +485,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     setMessages(prev => [...prev, roundMessage]);
     setConversationHistory(prev => [...prev, roundMessage]);
     
-  }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate, setCurrentTappingPoint]);
+  }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate, setCurrentTappingPoint, setMessages, setConversationHistory]);
 
   const determineNextState = (currentState: ChatState, aiResponse: string): ChatState | null => {
     console.log('[determineNextState] FALLBACK LOGIC - Current state:', currentState);
