@@ -7,6 +7,8 @@ export interface UserProfile {
   user_id: string;
   first_name: string;
   email: string;
+  industry?: string;
+  age_group?: string;
   created_at: string;
   updated_at: string;
 }
@@ -135,13 +137,15 @@ export const getCrisisResources = () => ({
 
 class SupabaseService {
   // Authentication
-  async signUp(firstName: string, email: string, password: string): Promise<{ user: User | null; session: Session | null; error: any }> {
+  async signUp(firstName: string, email: string, password: string, industry?: string, ageGroup?: string): Promise<{ user: User | null; session: Session | null; error: any }> {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          first_name: firstName
+          first_name: firstName,
+          industry: industry,
+          age_group: ageGroup
         },
         emailRedirectTo: 'https://tapaway.lovable.app/auth-callback'
       }

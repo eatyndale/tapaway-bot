@@ -19,6 +19,8 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [ageGroup, setAgeGroup] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -42,7 +44,7 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
         }
         onSuccess();
       } else {
-        result = await supabaseService.signUp(name, email, password);
+        result = await supabaseService.signUp(name, email, password, industry, ageGroup);
         if (result.error) {
           const errorMessage = supabaseService.parseAuthError(result.error);
           throw new Error(errorMessage);
@@ -265,6 +267,8 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
                     setEmail("");
                     setPassword("");
                     setName("");
+                    setIndustry("");
+                    setAgeGroup("");
                     setError("");
                   }}
                   className="w-full text-primary hover:text-primary/80"
@@ -276,18 +280,42 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
               <>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {!isLogin && (
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input
-                        id="name"
-                        type="text"
-                        placeholder="Enter your full name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        className="border-gray-300 focus:border-primary"
-                      />
-                    </div>
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Full Name</Label>
+                        <Input
+                          id="name"
+                          type="text"
+                          placeholder="Enter your full name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          required
+                          className="border-gray-300 focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="industry">Industry</Label>
+                        <Input
+                          id="industry"
+                          type="text"
+                          placeholder="e.g., Healthcare, Education, Technology"
+                          value={industry}
+                          onChange={(e) => setIndustry(e.target.value)}
+                          className="border-gray-300 focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ageGroup">Age Group</Label>
+                        <Input
+                          id="ageGroup"
+                          type="text"
+                          placeholder="e.g., 18-24, 25-34, 35-44"
+                          value={ageGroup}
+                          onChange={(e) => setAgeGroup(e.target.value)}
+                          className="border-gray-300 focus:border-primary"
+                        />
+                      </div>
+                    </>
                   )}
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
