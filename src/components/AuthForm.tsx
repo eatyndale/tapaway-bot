@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Heart } from "lucide-react";
 import { supabaseService } from "@/services/supabaseService";
 import { useToast } from "@/hooks/use-toast";
@@ -298,28 +299,40 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="industry">Industry</Label>
-                        <Input
-                          id="industry"
-                          type="text"
-                          placeholder="e.g., Healthcare, Education, Technology"
-                          value={industry}
-                          onChange={(e) => setIndustry(e.target.value)}
-                          required
-                          className="border-gray-300 focus:border-primary"
-                        />
+                        <Label htmlFor="industry">Industry *</Label>
+                        <Select value={industry} onValueChange={setIndustry} required>
+                          <SelectTrigger className="border-gray-300 focus:border-primary bg-white">
+                            <SelectValue placeholder="Select your industry" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white z-50">
+                            <SelectItem value="Healthcare">Healthcare</SelectItem>
+                            <SelectItem value="Education">Education</SelectItem>
+                            <SelectItem value="Technology">Technology</SelectItem>
+                            <SelectItem value="Finance">Finance</SelectItem>
+                            <SelectItem value="Retail">Retail</SelectItem>
+                            <SelectItem value="Manufacturing">Manufacturing</SelectItem>
+                            <SelectItem value="Construction">Construction</SelectItem>
+                            <SelectItem value="Hospitality">Hospitality</SelectItem>
+                            <SelectItem value="Legal">Legal</SelectItem>
+                            <SelectItem value="Marketing">Marketing</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="ageGroup">Age Group</Label>
-                        <Input
-                          id="ageGroup"
-                          type="text"
-                          placeholder="e.g., 18-24, 25-34, 35-44"
-                          value={ageGroup}
-                          onChange={(e) => setAgeGroup(e.target.value)}
-                          required
-                          className="border-gray-300 focus:border-primary"
-                        />
+                        <Label htmlFor="ageGroup">Age Group *</Label>
+                        <Select value={ageGroup} onValueChange={setAgeGroup} required>
+                          <SelectTrigger className="border-gray-300 focus:border-primary bg-white">
+                            <SelectValue placeholder="Select your age group" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white z-50">
+                            <SelectItem value="18-24">18-24</SelectItem>
+                            <SelectItem value="25-34">25-34</SelectItem>
+                            <SelectItem value="35-44">35-44</SelectItem>
+                            <SelectItem value="45-54">45-54</SelectItem>
+                            <SelectItem value="55+">55+</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </>
                   )}
