@@ -44,6 +44,10 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
         }
         onSuccess();
       } else {
+        // Validate required fields for signup
+        if (!industry.trim() || !ageGroup.trim()) {
+          throw new Error("Please fill in all required fields including Industry and Age Group");
+        }
         result = await supabaseService.signUp(name, email, password, industry, ageGroup);
         if (result.error) {
           const errorMessage = supabaseService.parseAuthError(result.error);
@@ -301,6 +305,7 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
                           placeholder="e.g., Healthcare, Education, Technology"
                           value={industry}
                           onChange={(e) => setIndustry(e.target.value)}
+                          required
                           className="border-gray-300 focus:border-primary"
                         />
                       </div>
@@ -312,6 +317,7 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
                           placeholder="e.g., 18-24, 25-34, 35-44"
                           value={ageGroup}
                           onChange={(e) => setAgeGroup(e.target.value)}
+                          required
                           className="border-gray-300 focus:border-primary"
                         />
                       </div>
