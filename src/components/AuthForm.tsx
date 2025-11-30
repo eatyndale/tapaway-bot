@@ -287,11 +287,11 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
                   {!isLogin && (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="name">Full Name</Label>
+                        <Label htmlFor="name">Nickname</Label>
                         <Input
                           id="name"
                           type="text"
-                          placeholder="Enter your full name"
+                          placeholder="What do I call you?"
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           required
