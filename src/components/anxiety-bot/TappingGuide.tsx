@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Play, Pause, SkipForward } from "lucide-react";
+import { Play, Pause, SkipForward, Volume2, VolumeX } from "lucide-react";
 import eyebrowGif from "@/assets/tapping/eyebrow.gif";
 import outerEyeGif from "@/assets/tapping/outer-eye.gif";
 import underEyeGif from "@/assets/tapping/under-eye.gif";
@@ -44,6 +44,8 @@ const TappingGuide = ({ setupStatements, statementOrder, onComplete, onPointChan
   const [currentPoint, setCurrentPoint] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(15);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -63,12 +65,37 @@ const TappingGuide = ({ setupStatements, statementOrder, onComplete, onPointChan
     onPointChange?.(currentPoint);
   }, [currentPoint, onPointChange]);
 
+  // Sync audio playback with tapping play/pause
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play().catch(console.error);
+      } else {
+        audioRef.current.pause();
+      }
+    }
+  }, [isPlaying]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+    };
+  }, []);
+
   const handleNext = () => {
     if (currentPoint < tappingPoints.length - 1) {
       setCurrentPoint(prev => prev + 1);
       setTimeRemaining(15);
     } else {
       setIsPlaying(false);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
       onComplete();
     }
   };
@@ -85,6 +112,10 @@ const TappingGuide = ({ setupStatements, statementOrder, onComplete, onPointChan
     setCurrentPoint(0);
     setTimeRemaining(15);
     setIsPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
   };
 
   const progress = ((currentPoint + (15 - timeRemaining) / 15) / tappingPoints.length) * 100;
@@ -97,6 +128,12 @@ const TappingGuide = ({ setupStatements, statementOrder, onComplete, onPointChan
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardContent className="p-6 space-y-6">
+        <audio
+          ref={audioRef}
+          src="/audio/ambient-tapping.mp3"
+          loop
+          preload="auto"
+        />
         {/* Progress */}
         <div className="space-y-2">
           <div className="flex justify-between text-sm text-gray-600">
@@ -173,6 +210,21 @@ const TappingGuide = ({ setupStatements, statementOrder, onComplete, onPointChan
           <Button onClick={handleNext} variant="outline" className="flex items-center space-x-2">
             <SkipForward className="w-4 h-4" />
             <span>Next Point</span>
+          </Button>
+
+          <Button 
+            onClick={() => {
+              setIsMuted(!isMuted);
+              if (audioRef.current) {
+                audioRef.current.muted = !isMuted;
+              }
+            }} 
+            variant="ghost" 
+            size="icon"
+            className="text-gray-600"
+            title={isMuted ? "Unmute" : "Mute"}
+          >
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </Button>
 
           {currentPoint > 0 && (
