@@ -720,16 +720,55 @@ Generate 3 VARIED setup statements. Each must be meaningfully different:
 - Statement 2: MUST include the problem/source ("${sessionContext.problem}")
 - Statement 3: Focus on physical sensation
 
-Remember the SETUP STATEMENT GRAMMAR rules:
-- Convert emotion to NOUN form (sad→sadness, anxious→anxiety, stressed→stress, overwhelmed→overwhelm)
-- Use natural, grammatically correct English
-- For creative/unusual emotions, add "feeling" (mumu-ish→"this mumu-ish feeling")
+**❌ BAD SETUP STATEMENTS (NEVER GENERATE THESE):**
+- "Even though I have this feeling behind..." ← missing "of being"
+- "Even though I'm experiencing overwhelmed..." ← adjective used as object
+- "Even though this overwhelmed about..." ← adjective treated as noun
+- "Even though this stress feels stressful..." ← redundant same-root words
 
-**EXAMPLE WITH PROPER VARIETY:**
+**✅ EMOTION TRANSFORMATIONS (MANDATORY):**
+| Adjective form | Noun form for "this ___" | Alternative forms |
+|----------------|--------------------------|-------------------|
+| overwhelmed    | overwhelm               | being overwhelmed, feeling of overwhelm |
+| stressed       | stress                  | being stressed |
+| anxious        | anxiety                 | being anxious |
+| sad            | sadness                 | being sad |
+| worried        | worry                   | being worried |
+| frustrated     | frustration             | being frustrated |
+| scared/afraid  | fear                    | being scared |
+| tired          | tiredness, exhaustion   | being tired |
+| angry          | anger                   | being angry |
+
+**PROBLEM PHRASE RULES:**
+- If problem is a gerund phrase like "feeling behind...", rephrase to infinitive: "being behind on things"
+- If problem is long (>4 words), summarize the core issue naturally
+- Problem should integrate smoothly into Statement 2 as the CAUSE, not be inserted literally
+
+**STATEMENT 2 STRUCTURE (problem-focused):**
+"Even though [simplified problem/cause] is causing [emotion-noun], I [acceptance phrase]"
+
+Examples of problem simplification:
+- "feeling behind at the end of the year" → "being behind on everything" OR "falling behind"
+- "my job is stressing me out" → "work stress" OR "my job"
+- "my relationship with my mother" → "this situation with my mom"
+
+**EXAMPLE 1 - Simple case:**
 If user feels "stressed" in "chest" from "work deadlines":
 - Statement 1 (feeling+location): "Even though I have this stress in my chest, I deeply and completely accept myself"
 - Statement 2 (PROBLEM-FOCUSED): "Even though work deadlines are causing all this stress, I choose to accept myself anyway"
 - Statement 3 (physical sensation): "Even though my chest feels tight and heavy, I'm okay"
+
+**EXAMPLE 2 - Complex problem phrase:**
+User feels "overwhelmed" in "chest" from "feeling behind at the end of the year":
+- Statement 1: "Even though I have this overwhelm sitting in my chest, I deeply and completely accept myself"
+- Statement 2: "Even though being behind on everything is causing all this overwhelm, I choose to accept myself anyway"
+- Statement 3: "Even though my chest feels heavy and tight, I am open to releasing this"
+
+**EXAMPLE 3 - Creative emotion:**
+User feels "mumu-ish" in "head" from "too many responsibilities":
+- Statement 1: "Even though I have this mumu-ish feeling in my head, I deeply accept myself"
+- Statement 2: "Even though all these responsibilities are creating this feeling, I choose to be patient with myself"
+- Statement 3: "Even though my head feels clouded and foggy, I am open to clarity"
 
 **DIRECTIVE:**
 <<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["..."],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
