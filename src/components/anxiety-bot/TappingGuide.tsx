@@ -65,14 +65,10 @@ const TappingGuide = ({ setupStatements, statementOrder, onComplete, onPointChan
     onPointChange?.(currentPoint);
   }, [currentPoint, onPointChange]);
 
-  // Sync audio playback with tapping play/pause
+  // Pause audio when not playing
   useEffect(() => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.play().catch(console.error);
-      } else {
-        audioRef.current.pause();
-      }
+    if (audioRef.current && !isPlaying) {
+      audioRef.current.pause();
     }
   }, [isPlaying]);
 
@@ -102,6 +98,12 @@ const TappingGuide = ({ setupStatements, statementOrder, onComplete, onPointChan
 
   const handlePlay = () => {
     setIsPlaying(true);
+    // Play audio directly from click handler to satisfy browser autoplay policy
+    if (audioRef.current) {
+      audioRef.current.play().catch((err) => {
+        console.error('[TappingGuide] Audio play failed:', err);
+      });
+    }
   };
 
   const handlePause = () => {
@@ -133,6 +135,8 @@ const TappingGuide = ({ setupStatements, statementOrder, onComplete, onPointChan
           src="/audio/ambient-tapping.mp3"
           loop
           preload="auto"
+          onCanPlayThrough={() => console.log('[TappingGuide] Audio ready to play')}
+          onError={(e) => console.error('[TappingGuide] Audio load error:', e)}
         />
         {/* Progress */}
         <div className="space-y-2">
