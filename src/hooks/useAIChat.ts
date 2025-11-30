@@ -128,7 +128,14 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { session } = await supabaseService.getOrCreateChatSession(user.id);
+        // Get user profile to include industry and age_group
+        const { profile } = await supabaseService.getProfile(user.id);
+        
+        const { session } = await supabaseService.getOrCreateChatSession(
+          user.id,
+          profile?.industry || null,
+          profile?.age_group || null
+        );
         if (session) {
           setCurrentChatSession(session.id);
           

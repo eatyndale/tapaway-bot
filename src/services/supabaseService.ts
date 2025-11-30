@@ -48,6 +48,8 @@ export interface ChatSession {
   messages: any;
   crisis_detected: boolean;
   crisis_resources: any;
+  industry?: string;
+  age_group?: string;
   created_at: string;
   updated_at: string;
 }
@@ -334,7 +336,7 @@ class SupabaseService {
   }
 
   // Chat session management
-  async getOrCreateChatSession(userId: string): Promise<{ session: ChatSession | null; error: any }> {
+  async getOrCreateChatSession(userId: string, industry?: string | null, ageGroup?: string | null): Promise<{ session: ChatSession | null; error: any }> {
     // Get the latest session number for this user
     const { data: lastSession } = await supabase
       .from('chat_sessions')
@@ -351,7 +353,9 @@ class SupabaseService {
       .insert({
         user_id: userId,
         session_number: nextSessionNumber,
-        messages: []
+        messages: [],
+        industry: industry,
+        age_group: ageGroup
       })
       .select()
       .single();
