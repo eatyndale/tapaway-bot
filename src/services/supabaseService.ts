@@ -21,6 +21,8 @@ export interface Assessment {
   severity_level: string;
   recommendation: string;
   needs_crisis_support: boolean;
+  industry?: string;
+  age_group?: string;
   created_at: string;
 }
 
@@ -36,6 +38,8 @@ export interface TappingSession {
   setup_statements: string[];
   reminder_phrases: string[];
   improvement?: number;
+  industry?: string;
+  age_group?: string;
   completed_at?: string;
   created_at: string;
   updated_at: string;
@@ -261,7 +265,7 @@ class SupabaseService {
   }
 
   // Assessment management
-  async submitAssessment(userId: string, answers: number[]): Promise<{ assessment: Assessment | null; error: any }> {
+  async submitAssessment(userId: string, answers: number[], industry?: string | null, ageGroup?: string | null): Promise<{ assessment: Assessment | null; error: any }> {
     const result = calculateAssessmentResult(answers);
     
     const { data, error } = await supabase
@@ -269,6 +273,8 @@ class SupabaseService {
       .insert({
         user_id: userId,
         answers,
+        industry: industry,
+        age_group: ageGroup,
         ...result
       })
       .select()
@@ -293,6 +299,8 @@ class SupabaseService {
     feeling: string;
     body_location: string;
     initial_intensity: number;
+    industry?: string | null;
+    age_group?: string | null;
   }): Promise<{ session: TappingSession | null; error: any }> {
     const eftScript = generateEFTScript(sessionData.problem, sessionData.feeling, sessionData.body_location);
     
@@ -300,7 +308,12 @@ class SupabaseService {
       .from('tapping_sessions')
       .insert({
         user_id: userId,
-        ...sessionData,
+        problem: sessionData.problem,
+        feeling: sessionData.feeling,
+        body_location: sessionData.body_location,
+        initial_intensity: sessionData.initial_intensity,
+        industry: sessionData.industry,
+        age_group: sessionData.age_group,
         setup_statements: eftScript.setup_statements,
         reminder_phrases: eftScript.reminder_phrases
       })

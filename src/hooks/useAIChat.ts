@@ -245,11 +245,16 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     if (chatState === 'gathering-intensity' && additionalContext?.initialIntensity) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user && updatedContext.problem && updatedContext.feeling && updatedContext.bodyLocation) {
+        // Get user profile for industry and age_group
+        const { profile } = await supabaseService.getProfile(user.id);
+        
         const { session: tappingSession } = await supabaseService.createTappingSession(user.id, {
           problem: updatedContext.problem,
           feeling: updatedContext.feeling,
           body_location: updatedContext.bodyLocation,
-          initial_intensity: additionalContext.initialIntensity
+          initial_intensity: additionalContext.initialIntensity,
+          industry: profile?.industry || null,
+          age_group: profile?.age_group || null
         });
         if (tappingSession) {
           updatedContext.tappingSessionId = tappingSession.id;

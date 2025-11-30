@@ -16,9 +16,11 @@ export type Database = {
     Tables: {
       assessments: {
         Row: {
+          age_group: string | null
           answers: number[]
           created_at: string
           id: string
+          industry: string | null
           needs_crisis_support: boolean
           recommendation: string
           severity_level: string
@@ -26,9 +28,11 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          age_group?: string | null
           answers: number[]
           created_at?: string
           id?: string
+          industry?: string | null
           needs_crisis_support?: boolean
           recommendation: string
           severity_level: string
@@ -36,9 +40,11 @@ export type Database = {
           user_id: string
         }
         Update: {
+          age_group?: string | null
           answers?: number[]
           created_at?: string
           id?: string
+          industry?: string | null
           needs_crisis_support?: boolean
           recommendation?: string
           severity_level?: string
@@ -121,6 +127,7 @@ export type Database = {
       }
       tapping_sessions: {
         Row: {
+          age_group: string | null
           body_location: string
           completed_at: string | null
           created_at: string
@@ -128,6 +135,7 @@ export type Database = {
           final_intensity: number | null
           id: string
           improvement: number | null
+          industry: string | null
           initial_intensity: number
           problem: string
           reminder_phrases: string[] | null
@@ -137,6 +145,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          age_group?: string | null
           body_location: string
           completed_at?: string | null
           created_at?: string
@@ -144,6 +153,7 @@ export type Database = {
           final_intensity?: number | null
           id?: string
           improvement?: number | null
+          industry?: string | null
           initial_intensity: number
           problem: string
           reminder_phrases?: string[] | null
@@ -153,6 +163,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          age_group?: string | null
           body_location?: string
           completed_at?: string | null
           created_at?: string
@@ -160,6 +171,7 @@ export type Database = {
           final_intensity?: number | null
           id?: string
           improvement?: number | null
+          industry?: string | null
           initial_intensity?: number
           problem?: string
           reminder_phrases?: string[] | null
