@@ -49,30 +49,36 @@ export type Database = {
       }
       chat_sessions: {
         Row: {
+          age_group: string | null
           created_at: string
           crisis_detected: boolean | null
           crisis_resources: Json | null
           id: string
+          industry: string | null
           messages: Json | null
           session_number: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          age_group?: string | null
           created_at?: string
           crisis_detected?: boolean | null
           crisis_resources?: Json | null
           id?: string
+          industry?: string | null
           messages?: Json | null
           session_number: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          age_group?: string | null
           created_at?: string
           crisis_detected?: boolean | null
           crisis_resources?: Json | null
           id?: string
+          industry?: string | null
           messages?: Json | null
           session_number?: number
           updated_at?: string
