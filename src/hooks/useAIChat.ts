@@ -165,7 +165,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     const greetingMessage: Message = {
       id: `greeting-${Date.now()}`,
       type: 'bot',
-      content: `Hello ${userProfile?.first_name || 'there'}! I'm here to help you work through anxiety using EFT tapping techniques. What would you like to work on today?`,
+      content: `Hello ${userProfile?.first_name || 'there'}! 💙 I'm here to help you work through what you're feeling using EFT tapping. What's been weighing on you lately?`,
       timestamp: new Date(),
       sessionId: sessionId
     };
@@ -351,9 +351,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           
           // Validate state transitions (warning only, don't block)
           const validTransitions: Record<string, string[]> = {
-            'initial': ['gathering-feeling'],
-            'gathering-feeling': ['gathering-location'],
-            'gathering-location': ['gathering-intensity'],
+            'conversation': ['gathering-intensity'],
             'gathering-intensity': ['tapping-point'],
             'tapping-point': ['tapping-point', 'tapping-breathing'],
             'tapping-breathing': ['post-tapping'],
@@ -567,28 +565,16 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     
     // Explicit state machine with keyword detection
     switch (currentState) {
-      case 'initial':
-        if (response.includes('what\'s the utmost negative emotion') || 
-            response.includes('what are you feeling') ||
-            response.includes('feeling right now')) {
-          console.log('[determineNextState] Transition: initial → gathering-feeling');
-          return 'gathering-feeling';
+      case 'conversation':
+        // In conversation mode, look for intensity collection keywords
+        if (response.includes('scale of 0') || 
+            response.includes('how intense') ||
+            response.includes('0-10') ||
+            response.includes('rate the intensity')) {
+          console.log('[determineNextState] Transition: conversation → gathering-intensity');
+          return 'gathering-intensity';
         }
         break;
-        
-      case 'gathering-feeling':
-        if (response.includes('where do you feel it') || 
-            response.includes('feel it in your body') ||
-            response.includes('where in your body')) {
-          console.log('[determineNextState] Transition: gathering-feeling → gathering-location');
-          return 'gathering-location';
-        }
-        break;
-        
-      case 'gathering-location':
-        // Always transition to gathering-intensity after location is provided
-        console.log('[determineNextState] Transition: gathering-location → gathering-intensity (automatic)');
-        return 'gathering-intensity';
         
       case 'gathering-intensity':
         if (response.includes('tapping') || response.includes('visual guide') || response.includes('follow along')) {
@@ -652,7 +638,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           setIntensityHistory([]);
           setCurrentTappingPoint(0);
           setCrisisDetected(false);
-          onStateChange('initial');
+          onStateChange('conversation');
           
           // Add initial greeting
           createInitialGreeting(session.id);

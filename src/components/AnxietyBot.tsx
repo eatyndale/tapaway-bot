@@ -23,7 +23,7 @@ const tappingPoints = [
 ];
 
 const AnxietyBot = () => {
-  const [chatState, setChatState] = useState<ChatState>('initial');
+  const [chatState, setChatState] = useState<ChatState>('conversation');
   const [session, setSession] = useState<ChatSession>({
     id: '',
     timestamp: new Date(),
@@ -75,7 +75,7 @@ const AnxietyBot = () => {
     };
     
     setSession(newSession);
-    setChatState('initial');
+    setChatState('conversation');
     setMessages([
       {
         id: `${newSessionId}-welcome`,
@@ -150,28 +150,7 @@ const AnxietyBot = () => {
       return;
     }
     
-    addMessage('bot', "Thank you for sharing that. How does this situation make you feel? Please describe the emotion you're experiencing (e.g., anxious, worried, stressed, angry).");
-    setChatState('gathering-feeling');
-    setCurrentInput("");
-  };
-
-  const handleFeelingSubmit = () => {
-    if (!currentInput.trim()) return;
-    
-    addMessage('user', currentInput);
-    setSession(prev => ({ ...prev, feeling: currentInput }));
-    addMessage('bot', "I understand. Where do you feel this emotion in your body? For example, in your chest, stomach, shoulders, throat, etc.");
-    setChatState('gathering-location');
-    setCurrentInput("");
-  };
-
-  const handleLocationSubmit = () => {
-    if (!currentInput.trim()) return;
-    
-    addMessage('user', currentInput);
-    setSession(prev => ({ ...prev, bodyLocation: currentInput }));
-    addMessage('bot', "Now, on a scale of 0-10, how intense is this feeling right now?");
-    setChatState('gathering-intensity');
+    addMessage('bot', "Thank you for sharing that. I can hear you're going through something difficult. Tell me more about how this makes you feel emotionally.");
     setCurrentInput("");
   };
 
@@ -315,14 +294,8 @@ const AnxietyBot = () => {
 
   const handleSubmit = () => {
     switch (chatState) {
-      case 'initial':
+      case 'conversation':
         handleProblemSubmit();
-        break;
-      case 'gathering-feeling':
-        handleFeelingSubmit();
-        break;
-      case 'gathering-location':
-        handleLocationSubmit();
         break;
       case 'gathering-intensity':
         handleIntensitySubmit();

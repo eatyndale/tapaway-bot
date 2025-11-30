@@ -144,38 +144,16 @@ const ChatInterface = ({
     if (isTapping || chatState === 'advice' || chatState === 'complete') return null;
 
     switch (chatState) {
-      case 'initial':
+      case 'conversation':
         return (
           <Textarea
             ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-            placeholder="Tell me what's bothering you..."
+            placeholder="Tell me what's on your mind..."
             value={currentInput}
             onChange={(e) => setCurrentInput(e.target.value)}
             onKeyPress={handleKeyPress}
             className="min-h-[80px] resize-none"
             rows={3}
-          />
-        );
-      
-      case 'gathering-feeling':
-        return (
-          <Input
-            ref={inputRef as React.RefObject<HTMLInputElement>}
-            placeholder="e.g., anxious, worried, angry..."
-            value={currentInput}
-            onChange={(e) => setCurrentInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-          />
-        );
-      
-      case 'gathering-location':
-        return (
-          <Input
-            ref={inputRef as React.RefObject<HTMLInputElement>}
-            placeholder="e.g., chest, stomach, shoulders..."
-            value={currentInput}
-            onChange={(e) => setCurrentInput(e.target.value)}
-            onKeyPress={handleKeyPress}
           />
         );
       
