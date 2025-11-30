@@ -628,7 +628,7 @@ The directive closing MUST be >> (two greater-than signs), NOT }} (braces).
 EXAMPLE RESPONSE at gathering-intensity (intensity received):
 "Thank you. Let's begin the tapping sequence. We'll start with the top of the head - tap gently there while focusing on that feeling."
 
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this sadness in my head, I deeply and completely accept myself","Even though I'm carrying this sadness in my head, I choose to accept myself anyway","Even though I notice this heavy sadness in my head, I'm okay"],"statement_order":[0,1,2,0,1,2,1,0]}>>
+<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this sadness in my head, I deeply and completely accept myself","Even though losing my job has caused this deep sadness, I choose to accept myself anyway","Even though my head feels heavy and foggy from all this grief, I'm okay"],"statement_order":[0,1,2,0,1,2,1,0]}>>
 
 **Key State Transitions (ALL REQUIRE DIRECTIVES):**
 - gathering-intensity → tapping-point (point 0): {"next_state":"tapping-point","tapping_point":0,"setup_statements":[...],"statement_order":[...]} ⚠️ MUST INCLUDE ARRAYS (statements generated internally, NOT shown in text)
@@ -917,8 +917,14 @@ Remember the SETUP STATEMENT GRAMMAR rules:
 - Use natural, grammatically correct English
 - For creative/unusual emotions, add "feeling" (mumu-ish→"this mumu-ish feeling")
 
+**EXAMPLE WITH PROPER VARIETY:**
+If user feels "stressed" in "chest" from "work deadlines":
+- Statement 1 (feeling+location): "Even though I have this stress in my chest, I deeply and completely accept myself"
+- Statement 2 (PROBLEM-FOCUSED): "Even though work deadlines are causing all this stress, I choose to accept myself anyway"
+- Statement 3 (physical sensation): "Even though my chest feels tight and heavy, I'm okay"
+
 **DIRECTIVE FORMAT (critical - must end with >> not }}):**
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["statement1","statement2","statement3"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
+<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this stress in my chest, I deeply and completely accept myself","Even though work deadlines are causing all this stress, I choose to accept myself anyway","Even though my chest feels tight and heavy, I'm okay"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
 
 **VERIFY:** The directive MUST end with >> (two angle brackets), NOT }} (two braces)!
 **IMPORTANT:** Use the CLEAN extracted values for feeling and bodyLocation. These have already been normalized (e.g., "thorax" → "chest").
@@ -1063,7 +1069,7 @@ WHEN NOT TAPPING:
 
 DIRECTIVE EXAMPLES:
 Starting tapping (after intensity received):
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this anxiety in my chest from work stress, I deeply and completely accept myself","Even though I'm carrying this anxiety in my chest from work stress, I choose to accept myself anyway","Even though I notice this heavy anxiety in my chest from work stress, I'm okay"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0,"collect":null,"notes":"starting first round"}>>
+<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this anxiety in my chest, I deeply and completely accept myself","Even though work stress is causing this tightness and anxiety, I choose to accept myself anyway","Even though my chest feels tight and constricted from all this pressure, I'm okay"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0,"collect":null,"notes":"starting first round"}>>
 
 Mid-round (moving to point 3):
 <<DIRECTIVE {"next_state":"tapping-point","tapping_point":3,"say_index":0,"collect":null,"notes":""}>>
