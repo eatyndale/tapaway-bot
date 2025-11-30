@@ -75,12 +75,20 @@ const Questionnaire = ({ onComplete }: QuestionnaireProps) => {
         return;
       }
 
+      // Get user profile for industry and age_group
+      const { profile } = await supabaseService.getProfile(user.id);
+
       // Convert answers to number array in order
       const answersArray = Array.from({ length: phq9Questions.length }, (_, i) => 
         parseInt(answers[i] || "0")
       );
 
-      const { assessment, error } = await supabaseService.submitAssessment(user.id, answersArray);
+      const { assessment, error } = await supabaseService.submitAssessment(
+        user.id, 
+        answersArray,
+        profile?.industry || null,
+        profile?.age_group || null
+      );
       
       if (error) {
         throw error;
