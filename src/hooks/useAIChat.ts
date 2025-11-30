@@ -267,6 +267,11 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     onSessionUpdate(updatedContext);
 
     try {
+      // Get last assistant message for context
+      const lastAssistantMessage = conversationHistory
+        .filter(m => m.type === 'bot')
+        .slice(-1)[0]?.content || '';
+      
       // Call AI function with enhanced context
       const { data, error } = await supabase.functions.invoke('eft-chat', {
         body: {
@@ -276,7 +281,8 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           sessionContext: updatedContext,
           conversationHistory: conversationHistory.slice(-20), // Increased context window
           currentTappingPoint,
-          intensityHistory
+          intensityHistory,
+          lastAssistantMessage  // NEW: pass for classification context
         }
       });
 
