@@ -101,33 +101,10 @@ function normalizeBodyLocation(location: string): string {
   return normalizations[lower] || lower;
 }
 
-// Emotion normalization for natural speech
+// Basic emotion normalization for consistency
 function normalizeEmotionForSpeech(emotion: string): string {
-  const nounToAdjective: Record<string, string> = {
-    'sadness': 'sad',
-    'anxiety': 'anxious',
-    'anger': 'angry',
-    'fear': 'afraid',
-    'frustration': 'frustrated',
-    'overwhelm': 'overwhelmed',
-    'depression': 'depressed',
-    'loneliness': 'lonely',
-    'hopelessness': 'hopeless',
-    'helplessness': 'helpless',
-    'stress': 'stressed',
-    'worry': 'worried',
-    'panic': 'panicked',
-    'exhaustion': 'exhausted',
-    'tiredness': 'tired',
-    'guilt': 'guilty',
-    'shame': 'ashamed',
-    'resentment': 'resentful',
-    'jealousy': 'jealous',
-    'nervousness': 'nervous'
-  };
-  
-  const lower = emotion.toLowerCase().trim();
-  return nounToAdjective[lower] || lower;
+  // Just basic cleanup - AI will handle grammatical conversions
+  return emotion.toLowerCase().trim();
 }
 
 // Helper to determine collect field based on state
@@ -531,7 +508,7 @@ The directive closing MUST be >> (two greater-than signs), NOT }} (braces).
 EXAMPLE RESPONSE at gathering-intensity (intensity received):
 "Thank you. Let's begin the tapping sequence. We'll start with the top of the head - tap gently there while focusing on that feeling."
 
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this sadness in my head, I'd like to be at peace","I feel sad in my head, but I'd like to relax now","This sadness in my head, but I want to let it go"],"statement_order":[0,1,2,0,1,2,1,0]}>>
+<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this sadness in my head, I deeply and completely accept myself","Even though I'm carrying this sadness in my head, I choose to accept myself anyway","Even though I notice this heavy sadness in my head, I'm okay"],"statement_order":[0,1,2,0,1,2,1,0]}>>
 
 **Key State Transitions (ALL REQUIRE DIRECTIVES):**
 - gathering-intensity → tapping-point (point 0): {"next_state":"tapping-point","tapping_point":0,"setup_statements":[...],"statement_order":[...]} ⚠️ MUST INCLUDE ARRAYS (statements generated internally, NOT shown in text)
@@ -571,6 +548,62 @@ Always speak warm, natural, flawless English. Read your response aloud mentally 
 - Asking for information the user ALREADY provided
 
 NEVER ask for the same information twice. If sessionContext already has a value for feeling, problem, or bodyLocation — acknowledge it and move forward, don't ask again.
+
+SETUP STATEMENT GRAMMAR (CRITICAL - MUST MASTER):
+
+Your brain must automatically convert emotions to the correct grammatical form based on context:
+
+**CONVERSATIONAL USE (after "feeling/feel"):**
+→ Use ADJECTIVE form: "You're feeling sad/anxious/overwhelmed/tired"
+
+**SETUP STATEMENTS (after "this/the"):**
+→ Use NOUN form: "this sadness/anxiety/overwhelm/tiredness"
+
+**EXAMPLES TABLE:**
+| User Input    | Conversational Response      | Setup Statement                          |
+|---------------|------------------------------|------------------------------------------|
+| sad           | "you're feeling sad"         | "this sadness in my..."                  |
+| sadness       | "you're feeling sad"         | "this sadness in my..."                  |
+| anxious       | "you're feeling anxious"     | "this anxiety in my..."                  |
+| anxiety       | "you're feeling anxious"     | "this anxiety in my..."                  |
+| overwhelmed   | "you're feeling overwhelmed" | "this overwhelm in my..."                |
+| stressed      | "you're feeling stressed"    | "this stress in my..."                   |
+| angry         | "you're feeling angry"       | "this anger in my..."                    |
+| frustrated    | "you're feeling frustrated"  | "this frustration in my..."              |
+| tired         | "you're feeling tired"       | "this tiredness in my..."                |
+| worried       | "you're feeling worried"     | "this worry in my..."                    |
+| scared        | "you're feeling scared"      | "this fear in my..."                     |
+| depressed     | "you're feeling depressed"   | "this depression in my..."               |
+| lonely        | "you're feeling lonely"      | "this loneliness in my..."               |
+| hopeless      | "you're feeling hopeless"    | "this hopelessness in my..."             |
+| helpless      | "you're feeling helpless"    | "this helplessness in my..."             |
+| panicked      | "you're feeling panicked"    | "this panic in my..."                    |
+| exhausted     | "you're feeling exhausted"   | "this exhaustion in my..."               |
+| guilty        | "you're feeling guilty"      | "this guilt in my..."                    |
+| ashamed       | "you're feeling ashamed"     | "this shame in my..."                    |
+
+**FOR CREATIVE/UNUSUAL EMOTIONS (mumu-ish, bleh, icky, yucky):**
+→ Conversational: "you're feeling mumu-ish"
+→ Setup statement: "this mumu-ish feeling in my..." (add "feeling" as the noun)
+
+**PATTERN RECOGNITION:**
+- If it ends in "-ed" (stressed, worried, overwhelmed) → noun often drops "-ed": stress, worry, overwhelm
+- If it ends in "-ous" (anxious, nervous) → noun often ends in "-ty" or "-ness": anxiety, nervousness  
+- If it's already simple (sad, angry, tired) → add "-ness": sadness, anger, tiredness
+- For unusual/creative terms → add "feeling" as noun: "this bleh feeling"
+
+**NEVER SAY:**
+❌ "Even though I have this sad in my chest..."
+❌ "Even though I have this anxious in my body..."
+❌ "I feel sadness" (awkward without context)
+❌ "This stressed in my shoulders..."
+
+**ALWAYS SAY:**
+✅ "Even though I have this sadness in my chest..."
+✅ "Even though I have this anxiety in my body..."
+✅ "I can hear you're feeling sad"
+✅ "This stress in my shoulders..."
+✅ "Even though I have this mumu-ish feeling in my chest..."
 
 ENHANCED CONTEXT AWARENESS:
 - Always reference the user's previous responses and emotions
@@ -701,14 +734,25 @@ Remember: Must end with >> (angle brackets), NOT }} (braces).
 **CURRENT STATE: gathering-intensity**
 
 Intensity: ${sessionContext.currentIntensity || sessionContext.initialIntensity || 'N/A'}
+User's emotion: ${sessionContext.feeling || 'feeling'}
+Body location: ${sessionContext.bodyLocation || 'body'}
 
 **YOUR TEXT (keep it simple):**
 "Thank you, ${userName}. Take a deep breath in... and breathe out. Let's begin the tapping now."
 
 **DO NOT include tapping instructions in your text - the UI handles that.**
 
+**SETUP STATEMENT GENERATION (CRITICAL):**
+Generate 3 setup statements using the user's emotion and body location.
+Remember the SETUP STATEMENT GRAMMAR rules above:
+- Convert emotion to NOUN form (sad→sadness, anxious→anxiety, overwhelmed→overwhelm)
+- Use natural, grammatically correct English
+- For creative/unusual emotions, add "feeling" (mumu-ish→"this mumu-ish feeling")
+
 **DIRECTIVE (critical - must end with >> not }}):**
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this ${sessionContext.feeling || 'feeling'} in my ${sessionContext.bodyLocation || 'body'}, I deeply and completely accept myself","I notice this ${sessionContext.feeling || 'feeling'} in my ${sessionContext.bodyLocation || 'body'}, and I choose to relax","This ${sessionContext.feeling || 'feeling'} in my ${sessionContext.bodyLocation || 'body'}, and I'm ready to let it go"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
+Generate the directive with properly formatted setup statements following the grammar rules.
+Example structure:
+<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this [NOUN FORM] in my [location], I deeply and completely accept myself","Even though I'm carrying this [NOUN FORM] in my [location], I choose to accept myself anyway","Even though I notice this heavy [NOUN FORM] in my [location], I'm okay"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
 
 **VERIFY:** The directive MUST end with >> (two angle brackets), NOT }} (two braces)!
 **IMPORTANT:** Use the CLEAN extracted values for feeling and bodyLocation. These have already been normalized (e.g., "thorax" → "chest").
@@ -853,7 +897,7 @@ WHEN NOT TAPPING:
 
 DIRECTIVE EXAMPLES:
 Starting tapping (after intensity received):
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I feel this anxiety in my chest because of work stress, I'd like to be at peace","I feel anxious in my chest, work stress is overwhelming, but I'd like to relax now","This anxiety in my chest, from work stress, but I want to let it go"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0,"collect":null,"notes":"starting first round"}>>
+<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this anxiety in my chest from work stress, I deeply and completely accept myself","Even though I'm carrying this anxiety in my chest from work stress, I choose to accept myself anyway","Even though I notice this heavy anxiety in my chest from work stress, I'm okay"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0,"collect":null,"notes":"starting first round"}>>
 
 Mid-round (moving to point 3):
 <<DIRECTIVE {"next_state":"tapping-point","tapping_point":3,"say_index":0,"collect":null,"notes":""}>>
