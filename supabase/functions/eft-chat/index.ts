@@ -90,11 +90,44 @@ function normalizeBodyLocation(location: string): string {
     'lumbar': 'lower back',
     'cervical': 'neck',
     'temples': 'head',
-    'brow': 'forehead'
+    'brow': 'forehead',
+    'everywhere': 'all over',
+    'all over my body': 'all over',
+    'cant explain': 'all over',
+    'i dont know': 'all over'
   };
   
   const lower = location.toLowerCase().trim();
   return normalizations[lower] || lower;
+}
+
+// Emotion normalization for natural speech
+function normalizeEmotionForSpeech(emotion: string): string {
+  const nounToAdjective: Record<string, string> = {
+    'sadness': 'sad',
+    'anxiety': 'anxious',
+    'anger': 'angry',
+    'fear': 'afraid',
+    'frustration': 'frustrated',
+    'overwhelm': 'overwhelmed',
+    'depression': 'depressed',
+    'loneliness': 'lonely',
+    'hopelessness': 'hopeless',
+    'helplessness': 'helpless',
+    'stress': 'stressed',
+    'worry': 'worried',
+    'panic': 'panicked',
+    'exhaustion': 'exhausted',
+    'tiredness': 'tired',
+    'guilt': 'guilty',
+    'shame': 'ashamed',
+    'resentment': 'resentful',
+    'jealousy': 'jealous',
+    'nervousness': 'nervous'
+  };
+  
+  const lower = emotion.toLowerCase().trim();
+  return nounToAdjective[lower] || lower;
 }
 
 // Helper to determine collect field based on state
@@ -107,6 +140,40 @@ function getCollectField(state: string): string {
     'post-tapping': 'intensity'
   };
   return collectMap[state] || 'null';
+}
+
+// State-specific response map for clarifications and recentering
+function getStateSpecificResponse(
+  state: string, 
+  relevance: 'maybe' | 'no', 
+  userName: string,
+  currentFeeling?: string
+): string {
+  const responses: Record<string, { maybe: string; no: string }> = {
+    "initial": {
+      maybe: `I'm not quite sure I caught what you're experiencing, ${userName}. Can you tell me what's been feeling heavy, stressful, or uncomfortable for you lately? Even one or two words is perfect.`,
+      no: `Hey ${userName}, I think you're just playing around right now — totally okay! 😊 When you're ready, just tell me what's bothering you and we'll tap on it together.`
+    },
+    "gathering-feeling": {
+      maybe: `I'm not 100% sure what emotion that points to, ${userName}. Is it something like sadness, anxiety, anger, overwhelm, or something else? Just give me anything that feels close.`,
+      no: `I can see you're testing me, ${userName} 😉 I'm here whenever you want to work on a real feeling — anxiety, stress, sadness, anything. Just say the word.`
+    },
+    "gathering-location": {
+      maybe: `That's okay if it's hard to explain, ${userName}. Even something simple like "everywhere", "chest", "head", "stomach", or "all over" is perfect. Where do you notice the ${currentFeeling || 'feeling'} most?`,
+      no: `Haha, nice try ${userName} 😄 I'm staying right here until you tell me where in your body you feel the ${currentFeeling || 'emotion'}. Even "I don't know" or "everywhere" works!`
+    },
+    "gathering-intensity": {
+      maybe: `Any number between 0 and 10 is fine, ${userName}. Even a guess helps — how intense is it right now?`,
+      no: `Come on ${userName}, give me a real number 0–10 so we can start tapping and make it lower 😊`
+    },
+    "post-tapping": {
+      maybe: `Take your time, ${userName}. Just give me a new number 0–10 for how intense it feels now — even if it's the same.`,
+      no: `I know you're joking, but I'm waiting patiently for that new intensity number so we can see how much progress you made 🎉`
+    }
+  };
+
+  const stateResponses = responses[state] || responses["initial"];
+  return relevance === 'maybe' ? stateResponses.maybe : stateResponses.no;
 }
 
 // Classification result interface
@@ -208,6 +275,87 @@ Rules:
   }
 }
 
+// History extraction interface
+interface HistoryExtraction {
+  problem: string | null;
+  feeling: string | null;
+  bodyLocation: string | null;
+  hasAllData: boolean;
+}
+
+// Extract previously mentioned data from conversation history
+async function extractFromHistory(
+  conversationHistory: any[],
+  openAIApiKey: string
+): Promise<HistoryExtraction> {
+  // Get last 15 user messages
+  const userMessages = conversationHistory
+    .filter((m: any) => m.type === 'user')
+    .slice(-15)
+    .map((m: any) => m.content)
+    .join('\n');
+
+  if (!userMessages.trim()) {
+    return { problem: null, feeling: null, bodyLocation: null, hasAllData: false };
+  }
+
+  const extractionPrompt = `You are an expert at extracting EFT session data from conversation history.
+Scan the user messages and extract any mentioned data.
+
+User messages:
+${userMessages}
+
+Return ONLY valid JSON:
+{
+  "problem": string or null,
+  "feeling": string or null,
+  "bodyLocation": string or null,
+  "hasAllData": boolean
+}
+
+Rules:
+- feeling: extract the CORE emotion word only (e.g., "sad", "anxious", "overwhelmed") — never full sentences
+- bodyLocation: normalize to simple terms ("everywhere", "chest", "stomach", "head", "all over my body")
+- problem: brief description of their situation
+- hasAllData: true only if all three fields have values
+
+Examples:
+- "I feel sad" → feeling: "sad"
+- "sadness" → feeling: "sad"  
+- "feeling down" → feeling: "sad" or "down"
+- "everywhere just blur" → bodyLocation: "everywhere" (if context suggests body)
+- "i cant explain it" (when asked about body location) → bodyLocation: "everywhere" or "all over"
+- "work is killing me" → problem: "work stress"`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: extractionPrompt }
+        ],
+        temperature: 0.2,
+        max_tokens: 100,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error('History extraction failed');
+
+    const result = JSON.parse(data.choices[0].message.content.trim());
+    console.log('[extractFromHistory] Extracted:', JSON.stringify(result));
+    return result;
+  } catch (error) {
+    console.error('[extractFromHistory] Error:', error);
+    return { problem: null, feeling: null, bodyLocation: null, hasAllData: false };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -282,55 +430,79 @@ serve(async (req) => {
 
     console.log('[eft-chat] Classification result:', JSON.stringify(classification));
 
-    // Handle "no" relevance - obvious trolling/jailbreak
-    if (classification.relevance === 'no') {
-      console.log('[eft-chat] Detected trolling/jailbreak - recentering user');
-      const recenterResponse = `${sanitizedUserName}, I don't quite understand. Or maybe you're testing me — that's okay! 😊 I'm here to help with anxiety, stress, or tough emotions using EFT tapping. What's bothering you today?`;
+    // Handle "no" or "maybe" relevance with STATE-SPECIFIC responses (NEVER reset state)
+    if (classification.relevance === 'no' || classification.relevance === 'maybe') {
+      console.log(`[eft-chat] Relevance=${classification.relevance} - returning state-specific response for state: ${sanitizedChatState}`);
       
+      const stateResponse = getStateSpecificResponse(
+        sanitizedChatState,
+        classification.relevance,
+        sanitizedUserName,
+        sessionContext.feeling
+      );
+      
+      // CRITICAL: Keep the SAME state - never reset
       return new Response(JSON.stringify({
-        response: `${recenterResponse}\n\n<<DIRECTIVE {"next_state":"${sanitizedChatState}","collect":"${getCollectField(sanitizedChatState)}"}>>`,
+        response: `${stateResponse}\n\n<<DIRECTIVE {"next_state":"${sanitizedChatState}","collect":"${getCollectField(sanitizedChatState)}"}>>`,
         crisisDetected: false
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Handle "maybe" relevance - needs clarification
-    if (classification.relevance === 'maybe') {
-      console.log('[eft-chat] Message unclear - asking for clarification');
-      const clarification = classification.clarification_question || 
-        `I'm not quite sure I caught that, ${sanitizedUserName}. Can you tell me a bit more?`;
-      
-      return new Response(JSON.stringify({
-        response: `${clarification}\n\n<<DIRECTIVE {"next_state":"${sanitizedChatState}","collect":"${getCollectField(sanitizedChatState)}"}>>`,
-        crisisDetected: false
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    // For "yes" relevance - extract from history AND current message
+    console.log('[eft-chat] Relevance confirmed - extracting from history + current');
+
+    const historyExtraction = await extractFromHistory(conversationHistory, openAIApiKey);
+    console.log('[eft-chat] History extraction:', JSON.stringify(historyExtraction));
+
+    // Merge: history first, then current classification (current takes precedence for new info)
+    if (historyExtraction.problem && !sessionContext.problem) {
+      sessionContext.problem = historyExtraction.problem;
+    }
+    if (historyExtraction.feeling && !sessionContext.feeling) {
+      sessionContext.feeling = normalizeEmotionForSpeech(historyExtraction.feeling);
+    }
+    if (historyExtraction.bodyLocation && !sessionContext.bodyLocation) {
+      sessionContext.bodyLocation = normalizeBodyLocation(historyExtraction.bodyLocation);
     }
 
-    // For "yes" relevance - update sessionContext with CLEAN extracted values
-    if (classification.relevance === 'yes' && classification.extracted) {
-      console.log('[eft-chat] Relevance confirmed - extracting clean values');
-      
+    // Now apply current classification extractions (these override history if present)
+    if (classification.extracted) {
       if (classification.extracted.problem && !sessionContext.problem) {
         sessionContext.problem = classification.extracted.problem;
-        console.log('[eft-chat] Extracted problem:', sessionContext.problem);
       }
       if (classification.extracted.feeling) {
-        sessionContext.feeling = classification.extracted.feeling;
-        console.log('[eft-chat] Extracted feeling:', sessionContext.feeling);
+        sessionContext.feeling = normalizeEmotionForSpeech(classification.extracted.feeling);
       }
       if (classification.extracted.bodyLocation) {
-        // Normalize body location
-        const normalized = normalizeBodyLocation(classification.extracted.bodyLocation);
-        sessionContext.bodyLocation = normalized;
-        console.log('[eft-chat] Extracted and normalized body location:', sessionContext.bodyLocation);
+        sessionContext.bodyLocation = normalizeBodyLocation(classification.extracted.bodyLocation);
       }
       if (classification.extracted.intensity !== null) {
         sessionContext.currentIntensity = classification.extracted.intensity;
-        console.log('[eft-chat] Extracted intensity:', sessionContext.currentIntensity);
       }
+    }
+
+    console.log('[eft-chat] Merged sessionContext:', JSON.stringify(sessionContext));
+
+    // ============================================================================
+    // AUTO-ADVANCE: If we have all required data in an early state, skip ahead
+    // ============================================================================
+    const earlyStates = ['initial', 'gathering-feeling', 'gathering-location'];
+    const hasAllRequiredData = sessionContext.problem && sessionContext.feeling && sessionContext.bodyLocation;
+
+    if (earlyStates.includes(sanitizedChatState) && hasAllRequiredData) {
+      console.log('[eft-chat] Auto-advancing: we have all data, moving to gathering-intensity');
+      
+      const feelingAdj = normalizeEmotionForSpeech(sessionContext.feeling);
+      const autoAdvanceResponse = `Okay ${sanitizedUserName}, I've got it — you're feeling ${feelingAdj}, ${sessionContext.bodyLocation}, from ${sessionContext.problem}. On a scale of 0–10, how intense is that feeling right now?`;
+      
+      return new Response(JSON.stringify({
+        response: `${autoAdvanceResponse}\n\n<<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>`,
+        crisisDetected: false
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // ============================================================================
@@ -382,6 +554,23 @@ USER CONTEXT:
 - Current tapping point: ${currentTappingPoint}
 - Intensity progression: ${JSON.stringify(intensityHistory)}
 - Full conversation history length: ${conversationHistory.length} messages
+
+NATURAL ENGLISH RULES (CRITICAL):
+Always speak warm, natural, flawless English. Read your response aloud mentally — if it sounds off to a human therapist, rewrite it.
+
+✅ GOOD:
+- "I can hear you're feeling sad" (adjective)
+- "you're carrying this sadness" (noun with article)
+- "Got it — sadness in your chest. That's heavy."
+- "Okay, so you're feeling anxious about work."
+
+❌ BAD (FORBIDDEN):
+- "you're feeling sadness" (noun without article)
+- "this sadness emotion" (redundant)
+- "I feel i am feeling mumu-ish in my thorax" (duplication)
+- Asking for information the user ALREADY provided
+
+NEVER ask for the same information twice. If sessionContext already has a value for feeling, problem, or bodyLocation — acknowledge it and move forward, don't ask again.
 
 ENHANCED CONTEXT AWARENESS:
 - Always reference the user's previous responses and emotions
@@ -447,22 +636,52 @@ This is the first message from the user.
 `;
         break;
       case 'gathering-feeling':
-        systemPrompt += `
+        // Check if we already have the feeling from extraction
+        if (sessionContext.feeling) {
+          const feelingAdj = normalizeEmotionForSpeech(sessionContext.feeling);
+          systemPrompt += `
+**CURRENT STATE: gathering-feeling**
+**IMPORTANT: We already extracted the feeling: "${sessionContext.feeling}"**
+
+The user has already told us they're feeling ${feelingAdj}. 
+DO NOT ask for the feeling again. Acknowledge it warmly and ask for body location.
+
+**YOUR RESPONSE:**
+"Thank you for sharing, ${userName}. I can hear you're feeling ${feelingAdj}. Where in your body do you notice this feeling?"
+
+<<DIRECTIVE {"next_state":"gathering-location","collect":"body_location"}>>
+`;
+        } else {
+          systemPrompt += `
 **CURRENT STATE: gathering-feeling**
 
 The user described their emotion: ${sessionContext.feeling || '[emotion]'}
 
 **YOUR RESPONSE:**
-"Thank you for sharing, ${userName}. I can hear that you're feeling ${sessionContext.feeling || '[emotion]'}. Where in your body do you feel this ${sessionContext.feeling || 'emotion'}?"
+Ask warmly what emotion they're experiencing. Keep it simple and encouraging.
 
-**DIRECTIVE (copy exactly, check the closing):**
-<<DIRECTIVE {"next_state":"gathering-location","collect":"body_location"}>>
-
-Remember: Must end with >> (angle brackets), NOT }} (braces).
+<<DIRECTIVE {"next_state":"gathering-feeling","collect":"feeling"}>>
 `;
+        }
         break;
       case 'gathering-location':
-        systemPrompt += `
+        // Check if we already have the body location from extraction
+        if (sessionContext.bodyLocation) {
+          const feelingAdj = normalizeEmotionForSpeech(sessionContext.feeling || 'feeling');
+          systemPrompt += `
+**CURRENT STATE: gathering-location**
+**IMPORTANT: We already extracted the body location: "${sessionContext.bodyLocation}"**
+
+The user has already told us the location is ${sessionContext.bodyLocation}. 
+DO NOT ask for the location again. Move to intensity rating.
+
+**YOUR RESPONSE:**
+"Thank you, ${userName}. Now, on a scale of 0 to 10, where 0 is no intensity and 10 is maximum intensity, how intense is that ${feelingAdj} feeling in your ${sessionContext.bodyLocation}?"
+
+<<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>
+`;
+        } else {
+          systemPrompt += `
 **CURRENT STATE: gathering-location**
 
 Body location: ${sessionContext.bodyLocation || '[body location]'}
@@ -475,6 +694,7 @@ Body location: ${sessionContext.bodyLocation || '[body location]'}
 
 Remember: Must end with >> (angle brackets), NOT }} (braces).
 `;
+        }
         break;
       case 'gathering-intensity':
         systemPrompt += `
