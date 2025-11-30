@@ -162,9 +162,7 @@ function formatBodyLocation(location: string): string {
 // Helper to determine collect field based on state
 function getCollectField(state: string): string {
   const collectMap: Record<string, string> = {
-    'initial': 'problem',
-    'gathering-feeling': 'feeling',
-    'gathering-location': 'body_location',
+    'conversation': 'conversation',
     'gathering-intensity': 'intensity',
     'post-tapping': 'intensity'
   };
@@ -179,17 +177,9 @@ function getStateSpecificResponse(
   currentFeeling?: string
 ): string {
   const responses: Record<string, { maybe: string; no: string }> = {
-    "initial": {
+    "conversation": {
       maybe: `That's okay, ${userName} — it can be hard to put these things into words sometimes. 💙 Let's start simple: what's been weighing on you lately? It could be work, relationships, health, or just a general feeling. Even one word is fine.`,
       no: `Hey ${userName}, I think you're just playing around right now — totally okay! 😊 When you're ready, just tell me what's bothering you and we'll tap on it together.`
-    },
-    "gathering-feeling": {
-      maybe: `I'm not 100% sure what emotion that points to, ${userName}. Is it something like sadness, anxiety, anger, overwhelm, or something else? Just give me anything that feels close.`,
-      no: `I can see you're testing me, ${userName} 😉 I'm here whenever you want to work on a real feeling — anxiety, stress, sadness, anything. Just say the word.`
-    },
-    "gathering-location": {
-      maybe: `That's okay if it's hard to explain, ${userName}. Even something simple like "everywhere", "chest", "head", "stomach", or "all over" is perfect. Where do you notice the ${currentFeeling || 'feeling'} most?`,
-      no: `Haha, nice try ${userName} 😄 I'm staying right here until you tell me where in your body you feel the ${currentFeeling || 'emotion'}. Even "I don't know" or "everywhere" works!`
     },
     "gathering-intensity": {
       maybe: `Any number between 0 and 10 is fine, ${userName}. Even a guess helps — how intense is it right now?`,
@@ -201,7 +191,7 @@ function getStateSpecificResponse(
     }
   };
 
-  const stateResponses = responses[state] || responses["initial"];
+  const stateResponses = responses[state] || responses["conversation"];
   return relevance === 'maybe' ? stateResponses.maybe : stateResponses.no;
 }
 
@@ -478,17 +468,17 @@ serve(async (req) => {
 
     // Handle "no" or "maybe" relevance with STATE-SPECIFIC responses (NEVER reset state)
     if (classification.relevance === 'no' || classification.relevance === 'maybe') {
-      // SPECIAL CASE: In initial state, "maybe" responses like "I don't know" should be treated encouragingly
-      if (sanitizedChatState === 'initial' && classification.relevance === 'maybe') {
+      // SPECIAL CASE: In conversation state, "maybe" responses like "I don't know" should be treated encouragingly
+      if (sanitizedChatState === 'conversation' && classification.relevance === 'maybe') {
         // Check if it's an overwhelm/uncertainty expression
         const uncertaintyPatterns = /don't know|dont know|not sure|can't explain|cant explain|hard to|difficult to|overwhelm|confused/i;
         if (uncertaintyPatterns.test(sanitizedMessage)) {
-          console.log('[eft-chat] Detected uncertainty/overwhelm in initial state - responding with encouragement');
+          console.log('[eft-chat] Detected uncertainty/overwhelm in conversation state - responding with encouragement');
           
           const encouragingResponse = `That's completely okay, ${sanitizedUserName} — sometimes it's hard to put these feelings into words, and that's normal. 💙 Let's start small: has anything been weighing on you lately? Work, relationships, health, or even just a general sense of unease? Even one word helps.`;
           
           return new Response(JSON.stringify({
-            response: `${encouragingResponse}\n\n<<DIRECTIVE {"next_state":"initial","collect":"problem"}>>`,
+            response: `${encouragingResponse}\n\n<<DIRECTIVE {"next_state":"conversation","collect":"conversation"}>>`,
             crisisDetected: false,
             extractedContext: {
               problem: sessionContext.problem,
@@ -564,12 +554,11 @@ serve(async (req) => {
     console.log('[eft-chat] Merged sessionContext:', JSON.stringify(sessionContext));
 
     // ============================================================================
-    // AUTO-ADVANCE: If we have all required data in an early state, skip ahead
+    // AUTO-ADVANCE: If we have all required data in conversation state, skip ahead
     // ============================================================================
-    const earlyStates = ['initial', 'gathering-feeling', 'gathering-location'];
     const hasAllRequiredData = sessionContext.problem && sessionContext.feeling && sessionContext.bodyLocation;
 
-    if (earlyStates.includes(sanitizedChatState) && hasAllRequiredData) {
+    if (sanitizedChatState === 'conversation' && hasAllRequiredData) {
       console.log('[eft-chat] Auto-advancing: we have all data, moving to gathering-intensity');
       
       // Build natural auto-advance response with smart redundancy handling
@@ -792,100 +781,73 @@ CURRENT STAGE GUIDANCE:`;
     console.log('[eft-chat] Current tapping point:', currentTappingPoint);
 
     switch (chatState) {
-      case 'initial':
-        // Check if we already have BOTH problem AND feeling extracted
-        if (sessionContext.problem && sessionContext.feeling) {
-          const feelingAdj = normalizeEmotionForSpeech(sessionContext.feeling);
-          systemPrompt += `
-**CURRENT STATE: initial**
-**IMPORTANT: User already provided BOTH problem ("${sessionContext.problem}") AND feeling ("${sessionContext.feeling}")**
+      case 'conversation':
+        const gatheredInfo = {
+          hasProblem: !!sessionContext.problem,
+          hasFeeling: !!sessionContext.feeling,
+          hasLocation: !!sessionContext.bodyLocation
+        };
+        
+        systemPrompt += `
+**CURRENT STATE: conversation (fluid gathering phase)**
+**YOUR GOAL:** Gather 3 pieces of info through natural, empathetic conversation:
 
-DO NOT ask for the feeling again! The user said "${sanitizedMessage}" which tells us both.
-Acknowledge warmly and ask for body location.
+INFO STATUS:
+1. Problem/Cause: ${gatheredInfo.hasProblem ? `✅ "${sessionContext.problem}"` : '❌ Still needed'}
+2. Emotion: ${gatheredInfo.hasFeeling ? `✅ "${sessionContext.feeling}"` : '❌ Still needed'}  
+3. Body Location: ${gatheredInfo.hasLocation ? `✅ "${sessionContext.bodyLocation}"` : '❌ Still needed'}
 
-**YOUR RESPONSE:**
-"I can hear that you're feeling ${feelingAdj} because of ${sessionContext.problem}, ${userName}. Where in your body do you notice this ${feelingAdj} feeling?"
+**CONVERSATION GUIDELINES:**
+- Be warm, empathetic, like a caring friend who genuinely listens
+- Let the user talk and vent - don't rush them through a checklist
+- Extract info naturally from what they share (they might give you 2-3 pieces at once!)
+- Ask for missing info in a natural, conversational way
+- You can acknowledge what they said AND ask for more in the same response
+- Use the user's exact emotional language in your responses to show you're listening
+- Reference their previous messages to build connection
 
-<<DIRECTIVE {"next_state":"gathering-location","collect":"body_location"}>>
-`;
-        } else {
-          systemPrompt += `
-**CURRENT STATE: initial**
+**HANDLING DIFFERENT USER INPUTS:**
 
-This is the first message from the user.
+If user shares something meaningful (even if vague):
+- Acknowledge with genuine empathy
+- Reflect back what you heard
+- Gently probe for specific details you still need
 
-**IF they just said hi/hello (greeting only):**
-"Hello ${userName}! I'm here to help you work through what you're feeling using EFT tapping. What would you like to work on today?"
-<<DIRECTIVE {"next_state":"initial","collect":"problem"}>>
+If user goes off-topic or says random things:
+- Engage briefly and warmly ("Ha, I hear you!")
+- Gently redirect: "So tell me, what's been weighing on you lately?"
 
-**IF they shared a problem/feeling:**
-"I can hear that you're experiencing ${sessionContext.problem || '[what they said]'}, ${userName}. Can you describe the main emotion you're feeling right now?"
-<<DIRECTIVE {"next_state":"gathering-feeling","collect":"feeling"}>>
+If user says "I don't know" or seems overwhelmed:
+- Normalize it: "That's completely okay — sometimes feelings are hard to put into words"
+- Offer gentle examples: "Is it work, relationships, health, or just a general unease?"
+- Be patient and supportive
 
-**CRITICAL:** The closing must be >> (two angle brackets), NOT }} (braces).
-`;
-        }
-        break;
-      case 'gathering-feeling':
-        // Check if we already have the feeling from extraction
-        if (sessionContext.feeling) {
-          const feelingAdj = normalizeEmotionForSpeech(sessionContext.feeling);
-          systemPrompt += `
-**CURRENT STATE: gathering-feeling**
-**IMPORTANT: We already extracted the feeling: "${sessionContext.feeling}"**
+If user provides all info at once (e.g., "work is stressing me out and my chest feels tight"):
+- Celebrate their openness! Acknowledge everything they shared
+- Move directly to intensity collection
 
-The user has already told us they're feeling ${feelingAdj}. 
-DO NOT ask for the feeling again. Acknowledge it warmly and ask for body location.
+**WHEN TO TRANSITION TO INTENSITY:**
+Once you have ALL THREE pieces (problem, feeling, location), ask for intensity rating naturally:
 
-**YOUR RESPONSE:**
-"Thank you for sharing, ${userName}. I can hear you're feeling ${feelingAdj}. Where in your body do you notice this feeling?"
-
-<<DIRECTIVE {"next_state":"gathering-location","collect":"body_location"}>>
-`;
-        } else {
-          systemPrompt += `
-**CURRENT STATE: gathering-feeling**
-
-The user described their emotion: ${sessionContext.feeling || '[emotion]'}
-
-**YOUR RESPONSE:**
-Ask warmly what emotion they're experiencing. Keep it simple and encouraging.
-
-<<DIRECTIVE {"next_state":"gathering-feeling","collect":"feeling"}>>
-`;
-        }
-        break;
-      case 'gathering-location':
-        // Check if we already have the body location from extraction
-        if (sessionContext.bodyLocation) {
-          const feelingAdj = normalizeEmotionForSpeech(sessionContext.feeling || 'feeling');
-          systemPrompt += `
-**CURRENT STATE: gathering-location**
-**IMPORTANT: We already extracted the body location: "${sessionContext.bodyLocation}"**
-
-The user has already told us the location is ${sessionContext.bodyLocation}. 
-DO NOT ask for the location again. Move to intensity rating.
-
-**YOUR RESPONSE:**
-"Thank you, ${userName}. Now, on a scale of 0 to 10, where 0 is no intensity and 10 is maximum intensity, how intense is that ${feelingAdj} feeling in your ${sessionContext.bodyLocation}?"
+"I hear you, ${userName}. You're feeling [emotion] about [problem], and you notice it [in/throughout your body location]. Before we start tapping, on a scale of 0-10, how intense does this feeling seem right now?"
 
 <<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>
+
+**IF STILL GATHERING INFO:**
+Continue the conversation naturally. Your response should:
+1. Warmly acknowledge what the user shared
+2. Ask for 1-2 missing pieces conversationally (don't interrogate!)
+3. Be empathetic and patient
+
+EXAMPLE RESPONSES:
+- "I can hear that work has been really weighing on you, ${userName}. What emotion comes up most when you think about it? Is it stress, anxiety, frustration, or something else?"
+- "That sounds really difficult, ${userName}. Where in your body do you notice this anxious feeling the most?"
+- "${userName}, I'm hearing that you're feeling overwhelmed by everything right now. Can you tell me a bit more about what's at the core of this overwhelm? Is it one specific thing, or more of a general feeling?"
+
+<<DIRECTIVE {"next_state":"conversation","collect":"conversation"}>>
+
+**CRITICAL:** Stay in 'conversation' state until you have all three pieces of information. Never rush. Build trust.
 `;
-        } else {
-          systemPrompt += `
-**CURRENT STATE: gathering-location**
-
-Body location: ${sessionContext.bodyLocation || '[body location]'}
-
-**YOUR RESPONSE:**
-"Thank you, ${userName}. Now, on a scale of 0 to 10, where 0 is no intensity and 10 is maximum intensity, how intense is that ${sessionContext.feeling || 'feeling'} in your ${sessionContext.bodyLocation || 'body'}?"
-
-**DIRECTIVE (copy exactly, check the closing):**
-<<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>
-
-Remember: Must end with >> (angle brackets), NOT }} (braces).
-`;
-        }
         break;
       case 'gathering-intensity':
         systemPrompt += `

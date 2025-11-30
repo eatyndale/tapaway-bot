@@ -27,7 +27,7 @@ const AIAnxietyBot = () => {
   const { toast } = useToast();
   const [chatState, setChatState] = useState<ChatState>(() => {
     const hasCompletedAssessment = localStorage.getItem('hasCompletedAssessment');
-    return hasCompletedAssessment ? 'initial' : 'questionnaire';
+    return hasCompletedAssessment ? 'conversation' : 'questionnaire';
   });
   const [currentInput, setCurrentInput] = useState("");
   const [currentIntensity, setCurrentIntensity] = useState([5]);
@@ -99,7 +99,7 @@ const AIAnxietyBot = () => {
   const handleQuestionnaireComplete = (session: QuestionnaireSession) => {
     setQuestionnaireSession(session);
     localStorage.setItem('hasCompletedAssessment', 'true');
-    setChatState('initial');
+    setChatState('conversation');
     toast({
       title: "Assessment Complete",
       description: `Your anxiety level: ${session.severity} (Score: ${session.totalScore}/27)`,
@@ -107,7 +107,7 @@ const AIAnxietyBot = () => {
   };
 
   const handleSkipAssessment = () => {
-    setChatState('initial');
+    setChatState('conversation');
     toast({
       title: "Assessment Skipped",
       description: "You can take the assessment later from the menu.",
