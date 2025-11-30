@@ -895,22 +895,30 @@ Intensity: ${sessionContext.currentIntensity || sessionContext.initialIntensity 
 User's emotion: ${sessionContext.feeling || 'feeling'}
 Body location: ${sessionContext.bodyLocation || 'body'}
 
-**YOUR TEXT (keep it simple):**
+**YOUR VISIBLE TEXT (KEEP IT SIMPLE - MAX 2 SENTENCES):**
 "Thank you, ${userName}. Take a deep breath in... and breathe out. Let's begin the tapping now."
 
-**DO NOT include tapping instructions in your text - the UI handles that.**
+**CRITICAL - DO NOT INCLUDE IN YOUR TEXT:**
+❌ DO NOT list the setup statements in your response
+❌ DO NOT say "Here are three setup statements..."
+❌ DO NOT number or bullet-point any statements
+❌ DO NOT include tapping instructions
 
-**SETUP STATEMENT GENERATION (CRITICAL):**
-Generate 3 setup statements using the user's emotion and body location.
-Remember the SETUP STATEMENT GRAMMAR rules above:
-- Convert emotion to NOUN form (sad→sadness, anxious→anxiety, overwhelmed→overwhelm)
+**WHY:** The setup statements are in the DIRECTIVE JSON below. The UI displays them visually during tapping. Including them in your text creates redundancy.
+
+**SETUP STATEMENT GENERATION (FOR DIRECTIVE JSON ONLY):**
+Generate 3 VARIED setup statements. Each must be meaningfully different:
+- Statement 1: Focus on feeling + location
+- Statement 2: MUST include the problem/source ("${sessionContext.problem}")
+- Statement 3: Focus on physical sensation
+
+Remember the SETUP STATEMENT GRAMMAR rules:
+- Convert emotion to NOUN form (sad→sadness, anxious→anxiety, stressed→stress, overwhelmed→overwhelm)
 - Use natural, grammatically correct English
 - For creative/unusual emotions, add "feeling" (mumu-ish→"this mumu-ish feeling")
 
-**DIRECTIVE (critical - must end with >> not }}):**
-Generate the directive with properly formatted setup statements following the grammar rules.
-Example structure:
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["Even though I have this [NOUN FORM] in my [location], I deeply and completely accept myself","Even though I'm carrying this [NOUN FORM] in my [location], I choose to accept myself anyway","Even though I notice this heavy [NOUN FORM] in my [location], I'm okay"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
+**DIRECTIVE FORMAT (critical - must end with >> not }}):**
+<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["statement1","statement2","statement3"],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
 
 **VERIFY:** The directive MUST end with >> (two angle brackets), NOT }} (two braces)!
 **IMPORTANT:** Use the CLEAN extracted values for feeling and bodyLocation. These have already been normalized (e.g., "thorax" → "chest").
