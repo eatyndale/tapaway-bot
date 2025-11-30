@@ -296,6 +296,18 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       console.log('[useAIChat] AI Response received. Has directive:', !!directive);
       console.log('[useAIChat] Current state:', chatState);
 
+      // Use cleaned extracted values from edge function
+      if (data.extractedContext) {
+        if (data.extractedContext.problem) updatedContext.problem = data.extractedContext.problem;
+        if (data.extractedContext.feeling) updatedContext.feeling = data.extractedContext.feeling;
+        if (data.extractedContext.bodyLocation) updatedContext.bodyLocation = data.extractedContext.bodyLocation;
+        if (data.extractedContext.currentIntensity !== undefined) {
+          updatedContext.currentIntensity = data.extractedContext.currentIntensity;
+        }
+        setSessionContext(updatedContext);
+        onSessionUpdate(updatedContext);
+      }
+
       // Add AI response with stripped content
       const aiMsg: Message = {
         id: `ai-${Date.now()}`,

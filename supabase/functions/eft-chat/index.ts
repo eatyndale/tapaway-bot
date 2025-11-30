@@ -107,6 +107,58 @@ function normalizeEmotionForSpeech(emotion: string): string {
   return emotion.toLowerCase().trim();
 }
 
+// Check if two words are semantically related (for avoiding redundancy)
+function areSemanticallyRelated(word1: string, word2: string): boolean {
+  if (!word1 || !word2) return false;
+  
+  const w1 = word1.toLowerCase().trim();
+  const w2 = word2.toLowerCase().trim();
+  
+  // Direct match or one contains the other
+  if (w1 === w2 || w1.includes(w2) || w2.includes(w1)) return true;
+  
+  // Common emotion pairs (adjective/noun forms that mean the same thing)
+  const semanticPairs = [
+    ['tired', 'tiredness', 'exhausted', 'exhaustion', 'fatigue'],
+    ['anxious', 'anxiety', 'anxiousness'],
+    ['sad', 'sadness'],
+    ['angry', 'anger'],
+    ['stressed', 'stress'],
+    ['worried', 'worry'],
+    ['frustrated', 'frustration'],
+    ['overwhelmed', 'overwhelm'],
+    ['depressed', 'depression'],
+    ['nervous', 'nervousness'],
+    ['fearful', 'fear', 'scared'],
+    ['panicked', 'panic'],
+    ['lonely', 'loneliness'],
+    ['hopeless', 'hopelessness'],
+    ['helpless', 'helplessness']
+  ];
+  
+  // Check if both words belong to the same semantic group
+  for (const group of semanticPairs) {
+    const w1InGroup = group.some(term => w1.includes(term) || term.includes(w1));
+    const w2InGroup = group.some(term => w2.includes(term) || term.includes(w2));
+    if (w1InGroup && w2InGroup) return true;
+  }
+  
+  return false;
+}
+
+// Format body location naturally
+function formatBodyLocation(location: string): string {
+  if (!location) return 'in your body';
+  
+  const lower = location.toLowerCase().trim();
+  const wholeBodyTerms = ['all over', 'everywhere', 'whole body', 'throughout', 'all over my body'];
+  
+  if (wholeBodyTerms.some(term => lower.includes(term))) {
+    return 'throughout your body';
+  }
+  return `in your ${location}`;
+}
+
 // Helper to determine collect field based on state
 function getCollectField(state: string): string {
   const collectMap: Record<string, string> = {
@@ -421,7 +473,13 @@ serve(async (req) => {
       // CRITICAL: Keep the SAME state - never reset
       return new Response(JSON.stringify({
         response: `${stateResponse}\n\n<<DIRECTIVE {"next_state":"${sanitizedChatState}","collect":"${getCollectField(sanitizedChatState)}"}>>`,
-        crisisDetected: false
+        crisisDetected: false,
+        extractedContext: {
+          problem: sessionContext.problem,
+          feeling: sessionContext.feeling,
+          bodyLocation: sessionContext.bodyLocation,
+          currentIntensity: sessionContext.currentIntensity
+        }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -433,20 +491,21 @@ serve(async (req) => {
     const historyExtraction = await extractFromHistory(conversationHistory, openAIApiKey);
     console.log('[eft-chat] History extraction:', JSON.stringify(historyExtraction));
 
-    // Merge: history first, then current classification (current takes precedence for new info)
-    if (historyExtraction.problem && !sessionContext.problem) {
+    // CRITICAL: Always prioritize extracted values (clean data) over raw frontend input
+    // Merge history extraction first (base layer)
+    if (historyExtraction.problem) {
       sessionContext.problem = historyExtraction.problem;
     }
-    if (historyExtraction.feeling && !sessionContext.feeling) {
+    if (historyExtraction.feeling) {
       sessionContext.feeling = normalizeEmotionForSpeech(historyExtraction.feeling);
     }
-    if (historyExtraction.bodyLocation && !sessionContext.bodyLocation) {
+    if (historyExtraction.bodyLocation) {
       sessionContext.bodyLocation = normalizeBodyLocation(historyExtraction.bodyLocation);
     }
 
-    // Now apply current classification extractions (these override history if present)
+    // Current classification takes final precedence (most recent/specific data)
     if (classification.extracted) {
-      if (classification.extracted.problem && !sessionContext.problem) {
+      if (classification.extracted.problem) {
         sessionContext.problem = classification.extracted.problem;
       }
       if (classification.extracted.feeling) {
@@ -471,12 +530,31 @@ serve(async (req) => {
     if (earlyStates.includes(sanitizedChatState) && hasAllRequiredData) {
       console.log('[eft-chat] Auto-advancing: we have all data, moving to gathering-intensity');
       
+      // Build natural auto-advance response with smart redundancy handling
       const feelingAdj = normalizeEmotionForSpeech(sessionContext.feeling);
-      const autoAdvanceResponse = `Okay ${sanitizedUserName}, I've got it — you're feeling ${feelingAdj}, ${sessionContext.bodyLocation}, from ${sessionContext.problem}. On a scale of 0–10, how intense is that feeling right now?`;
+      const location = sessionContext.bodyLocation;
+      const problem = sessionContext.problem;
+      const locationPhrase = formatBodyLocation(location);
+
+      let autoAdvanceResponse: string;
+
+      if (areSemanticallyRelated(sessionContext.feeling, problem)) {
+        // Feeling IS the problem - don't repeat it, use a single combined phrase
+        autoAdvanceResponse = `Okay ${sanitizedUserName}, I hear you — you're carrying this ${feelingAdj} feeling ${locationPhrase}. On a scale of 0–10, how intense is it right now?`;
+      } else {
+        // Problem and feeling are different - include both
+        autoAdvanceResponse = `Okay ${sanitizedUserName}, I hear you — you're feeling ${feelingAdj} ${locationPhrase} because of ${problem}. On a scale of 0–10, how intense is that feeling right now?`;
+      }
       
       return new Response(JSON.stringify({
         response: `${autoAdvanceResponse}\n\n<<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>`,
-        crisisDetected: false
+        crisisDetected: false,
+        extractedContext: {
+          problem: sessionContext.problem,
+          feeling: sessionContext.feeling,
+          bodyLocation: sessionContext.bodyLocation,
+          currentIntensity: sessionContext.currentIntensity
+        }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -604,6 +682,27 @@ Your brain must automatically convert emotions to the correct grammatical form b
 ✅ "I can hear you're feeling sad"
 ✅ "This stress in my shoulders..."
 ✅ "Even though I have this mumu-ish feeling in my chest..."
+
+**NATURAL RESPONSE PATTERNS (CRITICAL):**
+
+When problem and feeling are THE SAME (e.g., user says "I'm tired" - both problem and feeling are tiredness):
+→ DON'T say: "you're feeling tired, all over, from tiredness" (redundant!)
+→ DO say: "you're carrying this tired feeling throughout your body"
+
+When problem and feeling are DIFFERENT (e.g., problem="work stress", feeling="anxious"):
+→ "you're feeling anxious in your chest because of work stress"
+
+**BODY LOCATION PHRASING:**
+- "all over" / "everywhere" → "throughout your body"
+- "chest" → "in your chest"
+- "head" → "in your head"
+
+**EXAMPLE CONVERSATION RESPONSES:**
+| User Says | Your Response |
+|-----------|---------------|
+| "I'm just very tired" | "I hear you — you're carrying this tired feeling. Where do you notice it most in your body?" |
+| "I'm feeling tired all over" | "Okay, you're carrying this tiredness throughout your body. On a scale of 0-10, how intense is it?" |
+| "work is stressing me out, I feel anxious" | "I can hear that — you're feeling anxious because of work stress. Where in your body do you notice that anxiety?" |
 
 ENHANCED CONTEXT AWARENESS:
 - Always reference the user's previous responses and emotions
@@ -1064,7 +1163,13 @@ Gathering feeling:
 
     return new Response(JSON.stringify({ 
       response: finalResponse,
-      crisisDetected: crisisDetected 
+      crisisDetected: crisisDetected,
+      extractedContext: {
+        problem: sessionContext.problem,
+        feeling: sessionContext.feeling,
+        bodyLocation: sessionContext.bodyLocation,
+        currentIntensity: sessionContext.currentIntensity
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
