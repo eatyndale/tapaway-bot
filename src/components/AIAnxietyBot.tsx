@@ -139,18 +139,8 @@ const AIAnxietyBot = () => {
       }
     }
 
-    // Add context based on current state
-    switch (chatState) {
-      case 'initial':
-        additionalContext.problem = currentInput;
-        break;
-      case 'gathering-feeling':
-        additionalContext.feeling = currentInput;
-        break;
-      case 'gathering-location':
-        additionalContext.bodyLocation = currentInput;
-        break;
-    }
+    // Don't pre-populate additionalContext with raw input
+    // The edge function will extract clean values from the message
 
     await sendMessage(messageToSend, chatState, additionalContext);
     setCurrentInput("");
