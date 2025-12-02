@@ -315,6 +315,8 @@ const AuthForm = ({ onSuccess, onBack, message }: AuthFormProps) => {
                             <SelectItem value="Hospitality">Hospitality</SelectItem>
                             <SelectItem value="Legal">Legal</SelectItem>
                             <SelectItem value="Marketing">Marketing</SelectItem>
+                            <SelectItem value="Student">Student</SelectItem>
+                            <SelectItem value="Unemployed">Unemployed</SelectItem>
                             <SelectItem value="Other">Other</SelectItem>
                           </SelectContent>
                         </Select>
