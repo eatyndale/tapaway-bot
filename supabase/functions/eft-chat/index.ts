@@ -702,76 +702,36 @@ ${gatheredInfo.hasProblem && gatheredInfo.hasFeeling && gatheredInfo.hasLocation
 Intensity: ${sessionContext.currentIntensity || sessionContext.initialIntensity || 'N/A'}
 User's emotion: ${sessionContext.feeling || 'feeling'}
 Body location: ${sessionContext.bodyLocation || 'body'}
+Problem: ${sessionContext.problem || 'their situation'}
 
-**YOUR VISIBLE TEXT (KEEP IT SIMPLE - MAX 2 SENTENCES):**
-"Thank you, ${capitalizedName}. Take a deep breath in... and breathe out. Let's begin the tapping now."
+**YOUR TASK:**
+You will use the generate_tapping_directive tool to create the setup statements.
+Your visible response text should be short and supportive: "Thank you, ${capitalizedName}. Take a deep breath in... and breathe out. Let's begin the tapping now."
 
-**CRITICAL - DO NOT INCLUDE IN YOUR TEXT:**
-❌ DO NOT list the setup statements in your response
-❌ DO NOT say "Here are three setup statements..."
-❌ DO NOT number or bullet-point any statements
-❌ DO NOT include tapping instructions
-
-**WHY:** The setup statements are in the DIRECTIVE JSON below. The UI displays them visually during tapping. Including them in your text creates redundancy.
-
-**SETUP STATEMENT GENERATION (FOR DIRECTIVE JSON ONLY):**
+**SETUP STATEMENT RULES (for the tool call):**
 Generate 3 VARIED setup statements. Each must be meaningfully different:
 - Statement 1: Focus on feeling + location
 - Statement 2: MUST include the problem/source ("${sessionContext.problem}")
 - Statement 3: Focus on physical sensation
 
-**❌ BAD SETUP STATEMENTS (NEVER GENERATE THESE):**
-- "Even though I have this feeling behind..." ← missing "of being"
-- "Even though I'm experiencing overwhelmed..." ← adjective used as object
-- "Even though this overwhelmed about..." ← adjective treated as noun
-- "Even though this stress feels stressful..." ← redundant same-root words
+**EMOTION TRANSFORMATIONS:**
+| Adjective form | Noun form for "this ___" |
+|----------------|--------------------------|
+| overwhelmed    | overwhelm               |
+| stressed       | stress                  |
+| anxious        | anxiety                 |
+| sad            | sadness                 |
+| worried        | worry                   |
+| frustrated     | frustration             |
+| scared/afraid  | fear                    |
+| tired          | tiredness, exhaustion   |
+| angry          | anger                   |
 
-**✅ EMOTION TRANSFORMATIONS (MANDATORY):**
-| Adjective form | Noun form for "this ___" | Alternative forms |
-|----------------|--------------------------|-------------------|
-| overwhelmed    | overwhelm               | being overwhelmed, feeling of overwhelm |
-| stressed       | stress                  | being stressed |
-| anxious        | anxiety                 | being anxious |
-| sad            | sadness                 | being sad |
-| worried        | worry                   | being worried |
-| frustrated     | frustration             | being frustrated |
-| scared/afraid  | fear                    | being scared |
-| tired          | tiredness, exhaustion   | being tired |
-| angry          | anger                   | being angry |
-
-**PROBLEM PHRASE RULES:**
-- If problem is a gerund phrase like "feeling behind...", rephrase to infinitive: "being behind on things"
-- If problem is long (>4 words), summarize the core issue naturally
-- Problem should integrate smoothly into Statement 2 as the CAUSE, not be inserted literally
-
-**STATEMENT 2 STRUCTURE (problem-focused):**
-"Even though [simplified problem/cause] is causing [emotion-noun], I [acceptance phrase]"
-
-Examples of problem simplification:
-- "feeling behind at the end of the year" → "being behind on everything" OR "falling behind"
-- "my job is stressing me out" → "work stress" OR "my job"
-- "my relationship with my mother" → "this situation with my mom"
-
-**EXAMPLE 1 - Simple case:**
+**EXAMPLE:**
 If user feels "stressed" in "chest" from "work deadlines":
-- Statement 1 (feeling+location): "Even though I have this stress in my chest, I deeply and completely accept myself"
-- Statement 2 (PROBLEM-FOCUSED): "Even though work deadlines are causing all this stress, I choose to accept myself anyway"
-- Statement 3 (physical sensation): "Even though my chest feels tight and heavy, I'm okay"
-
-**EXAMPLE 2 - Complex problem phrase:**
-User feels "overwhelmed" in "chest" from "feeling behind at the end of the year":
-- Statement 1: "Even though I have this overwhelm sitting in my chest, I deeply and completely accept myself"
-- Statement 2: "Even though being behind on everything is causing all this overwhelm, I choose to accept myself anyway"
-- Statement 3: "Even though my chest feels heavy and tight, I am open to releasing this"
-
-**EXAMPLE 3 - Creative emotion:**
-User feels "mumu-ish" in "head" from "too many responsibilities":
-- Statement 1: "Even though I have this mumu-ish feeling in my head, I deeply accept myself"
-- Statement 2: "Even though all these responsibilities are creating this feeling, I choose to be patient with myself"
-- Statement 3: "Even though my head feels clouded and foggy, I am open to clarity"
-
-**DIRECTIVE:**
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":["..."],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
+- Statement 1: "Even though I have this stress in my chest, I deeply and completely accept myself"
+- Statement 2: "Even though work deadlines are causing all this stress, I choose to accept myself anyway"
+- Statement 3: "Even though my chest feels tight and heavy, I'm okay"
 `;
         break;
       case 'tapping-point':
@@ -878,8 +838,105 @@ After providing the advice, you MUST include this exact directive:
         break;
     }
 
-    const messages = [
-      { role: 'system', content: systemPrompt + `
+    // ============================================================================
+    // TOOL CALLING FOR SETUP STATEMENTS (gathering-intensity state)
+    // This guarantees valid JSON output for setup statements
+    // ============================================================================
+    
+    const generateTappingDirectiveTool = {
+      type: "function" as const,
+      function: {
+        name: "generate_tapping_directive",
+        description: "Generate the tapping directive with setup statements for EFT therapy",
+        parameters: {
+          type: "object",
+          properties: {
+            setup_statements: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of exactly 3 varied EFT setup statements",
+              minItems: 3,
+              maxItems: 3
+            },
+            visible_response: {
+              type: "string",
+              description: "Short supportive message to show the user (1-2 sentences)"
+            }
+          },
+          required: ["setup_statements", "visible_response"]
+        }
+      }
+    };
+
+    let aiResponse: string;
+    let extractedDirective: any = null;
+
+    // Use tool calling for gathering-intensity to guarantee valid JSON
+    if (sanitizedChatState === 'gathering-intensity') {
+      console.log('[eft-chat] Using tool calling for setup statement generation');
+      
+      const toolMessages = [
+        { role: 'system', content: systemPrompt },
+        ...conversationHistory.slice(-20).map((msg: any) => ({
+          role: msg.type === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        })),
+        { role: 'user', content: sanitizedMessage }
+      ];
+
+      const toolResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: toolMessages,
+          tools: [generateTappingDirectiveTool],
+          tool_choice: { type: "function", function: { name: "generate_tapping_directive" } },
+          temperature: 0.7,
+          max_tokens: 600,
+        }),
+      });
+
+      const toolData = await toolResponse.json();
+      
+      if (!toolResponse.ok) {
+        throw new Error(toolData.error?.message || 'OpenAI API error (tool calling)');
+      }
+
+      const toolCall = toolData.choices[0].message.tool_calls?.[0];
+      
+      if (toolCall && toolCall.function.name === 'generate_tapping_directive') {
+        const toolArgs = JSON.parse(toolCall.function.arguments);
+        console.log('[eft-chat] Tool call successful:', JSON.stringify(toolArgs));
+        
+        // Build the directive from tool output
+        extractedDirective = {
+          next_state: 'tapping-point',
+          tapping_point: 0,
+          setup_statements: toolArgs.setup_statements,
+          statement_order: [0, 1, 2, 0, 1, 2, 1, 0],
+          say_index: 0
+        };
+        
+        // Use the visible response from tool or fallback
+        aiResponse = toolArgs.visible_response || `Thank you, ${capitalizedName}. Take a deep breath in... and breathe out. Let's begin the tapping now.`;
+        
+        // Append the directive in the expected format for downstream parsing
+        aiResponse += `\n\n<<DIRECTIVE ${JSON.stringify(extractedDirective)}>>`;
+        
+        console.log('[eft-chat] ✅ Setup statements generated via tool calling');
+        console.log('[eft-chat] Statements:', toolArgs.setup_statements);
+      } else {
+        console.error('[eft-chat] Tool call failed, falling back to regular response');
+        throw new Error('Tool call did not return expected function');
+      }
+    } else {
+      // Regular API call for all other states
+      const messages = [
+        { role: 'system', content: systemPrompt + `
 
 CRITICAL RULES:
 - ONLY do ONE step at a time
@@ -897,37 +954,39 @@ DIRECTIVE FORMAT (MANDATORY):
 Examples:
 <<DIRECTIVE {"next_state":"conversation","collect":"conversation"}>>
 <<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>
-<<DIRECTIVE {"next_state":"tapping-point","tapping_point":0,"setup_statements":[...],"statement_order":[0,1,2,0,1,2,1,0],"say_index":0}>>
+<<DIRECTIVE {"next_state":"post-tapping","collect":"intensity"}>>
+<<DIRECTIVE {"next_state":"advice"}>>
+<<DIRECTIVE {"next_state":"complete"}>>
 ` },
-      // Enhanced conversation history with more context
-      ...conversationHistory.slice(-20).map((msg: any) => ({
-        role: msg.type === 'user' ? 'user' : 'assistant',
-        content: msg.content
-      })),
-      { role: 'user', content: sanitizedMessage }
-    ];
+        ...conversationHistory.slice(-20).map((msg: any) => ({
+          role: msg.type === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        })),
+        { role: 'user', content: sanitizedMessage }
+      ];
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages,
-        temperature: 0.7,
-        max_tokens: 500,
-      }),
-    });
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages,
+          temperature: 0.7,
+          max_tokens: 500,
+        }),
+      });
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error?.message || 'OpenAI API error');
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'OpenAI API error');
+      }
+
+      aiResponse = data.choices[0].message.content;
     }
-
-    const aiResponse = data.choices[0].message.content;
     
     console.log('[eft-chat] Generated AI response (preview):', aiResponse.substring(0, 200));
     console.log('[eft-chat] Response length:', aiResponse.length);
