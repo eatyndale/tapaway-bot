@@ -699,39 +699,70 @@ ${gatheredInfo.hasProblem && gatheredInfo.hasFeeling && gatheredInfo.hasLocation
         systemPrompt += `
 **CURRENT STATE: gathering-intensity**
 
-Intensity: ${sessionContext.currentIntensity || sessionContext.initialIntensity || 'N/A'}
-User's emotion: ${sessionContext.feeling || 'feeling'}
-Body location: ${sessionContext.bodyLocation || 'body'}
-Problem: ${sessionContext.problem || 'their situation'}
+**USER'S CONTEXT:**
+- They're dealing with: ${sessionContext.problem || 'a difficult situation'}
+- They're feeling: ${sessionContext.feeling || 'distressed'}
+- They feel it in their: ${sessionContext.bodyLocation || 'body'}
+- Intensity: ${sessionContext.currentIntensity || sessionContext.initialIntensity || 'N/A'}/10
 
 **YOUR TASK:**
-You will use the generate_tapping_directive tool to create the setup statements.
-Your visible response text should be short and supportive: "Thank you, ${capitalizedName}. Take a deep breath in... and breathe out. Let's begin the tapping now."
+Use the generate_tapping_directive tool to create 3 grammatically perfect setup statements.
+Your visible response should be short: "Thank you, ${capitalizedName}. Take a deep breath in... and breathe out. Let's begin the tapping now."
 
-**SETUP STATEMENT RULES (for the tool call):**
-Generate 3 VARIED setup statements. Each must be meaningfully different:
-- Statement 1: Focus on feeling + location
-- Statement 2: MUST include the problem/source ("${sessionContext.problem}")
-- Statement 3: Focus on physical sensation
+**CRITICAL GRAMMAR RULES - READ CAREFULLY:**
 
-**EMOTION TRANSFORMATIONS:**
-| Adjective form | Noun form for "this ___" |
-|----------------|--------------------------|
-| overwhelmed    | overwhelm               |
-| stressed       | stress                  |
-| anxious        | anxiety                 |
-| sad            | sadness                 |
-| worried        | worry                   |
-| frustrated     | frustration             |
-| scared/afraid  | fear                    |
-| tired          | tiredness, exhaustion   |
-| angry          | anger                   |
+1. **ADJECTIVES vs NOUNS (most common error!):**
+   - "exhausted", "stressed", "anxious", "overwhelmed" are ADJECTIVES
+   - You MUST convert to NOUNS when using "this ___":
+   - ❌ BAD: "this exhausted", "this stressed", "this anxious", "this overwhelmed"
+   - ✅ GOOD: "this exhaustion", "this stress", "this anxiety", "this overwhelm"
+   
+   | Adjective    | Noun form         |
+   |--------------|-------------------|
+   | exhausted    | exhaustion        |
+   | stressed     | stress            |
+   | anxious      | anxiety           |
+   | overwhelmed  | overwhelm         |
+   | frustrated   | frustration       |
+   | worried      | worry             |
+   | scared/afraid| fear              |
+   | sad          | sadness           |
+   | tired        | tiredness         |
+   | angry        | anger             |
 
-**EXAMPLE:**
-If user feels "stressed" in "chest" from "work deadlines":
-- Statement 1: "Even though I have this stress in my chest, I deeply and completely accept myself"
-- Statement 2: "Even though work deadlines are causing all this stress, I choose to accept myself anyway"
-- Statement 3: "Even though my chest feels tight and heavy, I'm okay"
+2. **ARTICLES ARE REQUIRED:**
+   - ❌ BAD: "about project", "from work", "about deadline"
+   - ✅ GOOD: "about the project", "from my work", "about this deadline"
+
+3. **COMPLETE NATURAL SENTENCES:**
+   - ❌ BAD: "I have this project and I feel exhausted"
+   - ✅ GOOD: "this project is leaving me exhausted"
+   - ❌ BAD: "I'm experiencing exhausted about project"
+   - ✅ GOOD: "I'm experiencing exhaustion about this project"
+
+**EXAMPLES OF PERFECT STATEMENTS:**
+
+If feeling "exhausted" about "project" in "body":
+- ✅ "Even though I have this exhaustion in my body from the project, I deeply and completely accept myself"
+- ✅ "Even though this project is leaving me exhausted, I choose to accept myself anyway"
+- ✅ "Even though my body feels heavy and tired from all this, I'm okay"
+
+If feeling "stressed" about "work deadlines" in "chest":
+- ✅ "Even though I have this stress in my chest, I deeply and completely accept myself"
+- ✅ "Even though work deadlines are causing all this tension, I choose to accept myself anyway"
+- ✅ "Even though my chest feels tight and heavy, I'm okay"
+
+If feeling "anxious" about "upcoming presentation" in "stomach":
+- ✅ "Even though I have this anxiety in my stomach about the presentation, I deeply and completely accept myself"
+- ✅ "Even though the upcoming presentation is making me anxious, I choose to accept myself anyway"
+- ✅ "Even though my stomach feels knotted and tense, I'm okay"
+
+**SETUP STATEMENT VARIETY (each must be different):**
+- Statement 1: Focus on feeling noun + body location
+- Statement 2: MUST reference the problem/source naturally
+- Statement 3: Focus on physical sensation description
+
+**FINAL CHECK:** Read each statement out loud in your mind. Does it sound like natural English a native speaker would say? If it sounds awkward or robotic, rewrite it.
 `;
         break;
       case 'tapping-point':
