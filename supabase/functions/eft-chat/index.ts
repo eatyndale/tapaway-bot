@@ -707,7 +707,9 @@ ${gatheredInfo.hasProblem && gatheredInfo.hasFeeling && gatheredInfo.hasLocation
 
 **YOUR TASK:**
 Use the generate_tapping_directive tool to create 3 grammatically perfect setup statements.
-Your visible response should be short: "Thank you, ${capitalizedName}. Take a deep breath in... and breathe out. Let's begin the tapping now."
+Your visible response should be short: "Thank you, ${capitalizedName}. Take a deep breath in... and breathe out. Let's begin the setup."
+
+Note: After this, user will go through the SETUP phase (karate chop tapping with these statements) before the main tapping sequence.
 
 **CRITICAL GRAMMAR RULES - READ CAREFULLY:**
 

@@ -16,6 +16,11 @@ interface SessionContext {
   reminderPhrases?: string[];
   statementOrder?: number[];
   tappingSessionId?: string;
+  roundsWithoutReduction?: number;
+  previousIntensities?: number[];
+  reminderPhraseType?: 'acknowledging' | 'partial-release' | 'full-release';
+  deepeningLevel?: number;
+  returningFromTapping?: boolean;
 }
 
 interface Directive {
@@ -352,11 +357,12 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           // Validate state transitions (warning only, don't block)
           const validTransitions: Record<string, string[]> = {
             'conversation': ['gathering-intensity'],
-            'gathering-intensity': ['tapping-point'],
+            'gathering-intensity': ['setup'],
+            'setup': ['tapping-point'],
             'tapping-point': ['tapping-point', 'tapping-breathing'],
             'tapping-breathing': ['post-tapping'],
-            'post-tapping': ['tapping-point', 'advice'],
-            'advice': ['complete']
+            'post-tapping': ['setup', 'conversation', 'advice'],
+            'advice': ['complete', 'conversation']
           };
           
           const allowedNextStates = validTransitions[chatState] || [];
@@ -432,18 +438,25 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     }
   }, [messages, userProfile, currentChatSession, sessionContext, conversationHistory, onStateChange, onSessionUpdate, onCrisisDetected]);
 
-  const startNewTappingRound = useCallback(async (currentIntensity: number) => {
+  const startNewTappingRound = useCallback(async (currentIntensity: number, phraseType?: 'acknowledging' | 'partial-release' | 'full-release') => {
     console.log('[useAIChat] Starting new tapping round with intensity:', currentIntensity);
     
-    // Generate new setup statements based on current intensity
+    // Generate new setup statements based on current intensity and phrase type
     const feeling = sessionContext.feeling || 'this feeling';
     const bodyLocation = sessionContext.bodyLocation || 'my body';
     const problem = sessionContext.problem || 'this issue';
     
+    // Determine reminder phrase type based on intensity if not provided
+    const determinedPhraseType = phraseType || (
+      currentIntensity > 3 ? 'acknowledging' : 
+      currentIntensity > 0 ? 'partial-release' : 
+      'full-release'
+    );
+    
     const newSetupStatements = [
-      `Even though I still feel ${feeling} at ${currentIntensity}/10 in ${bodyLocation}, I deeply accept myself`,
-      `This remaining ${feeling} in ${bodyLocation}, I choose to release it completely`,
-      `Even with this ${currentIntensity}/10 ${feeling}, I'm making progress and I can let it go`
+      `Even though I still have this ${feeling} in my ${bodyLocation}, I deeply and completely accept myself`,
+      `Even though ${problem} is still affecting me, I choose to accept myself anyway`,
+      `Even with this remaining ${feeling}, I'm making progress and I accept myself`
     ];
     
     const statementOrder = [0, 1, 2, 0, 1, 2, 1, 0]; // Standard order
@@ -451,13 +464,14 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     // Increment round number
     const newRound = (sessionContext.round || 1) + 1;
     
-    // Update session context
+    // Update session context with phrase type
     const updatedContext = {
       ...sessionContext,
       currentIntensity: currentIntensity,
       round: newRound,
       setupStatements: newSetupStatements,
-      statementOrder: statementOrder
+      statementOrder: statementOrder,
+      reminderPhraseType: determinedPhraseType
     };
     
     setSessionContext(updatedContext);
@@ -486,10 +500,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     setMessages(prev => [...prev, roundMessage]);
     setConversationHistory(prev => [...prev, roundMessage]);
     
-    // Use setTimeout to ensure state updates have propagated
-    // This allows React to batch and complete all state updates first
+    // Go to setup phase first (karate chop), then tapping sequence
     setTimeout(() => {
-      onStateChange('tapping-point');
+      onStateChange('setup');
     }, 0);
     
   }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate, setCurrentTappingPoint, setMessages, setConversationHistory]);
@@ -509,7 +522,36 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     console.log('[useAIChat] Initial intensity was:', sessionContext.initialIntensity);
     
     const initialIntensity = sessionContext.initialIntensity || 10;
+    const previousIntensity = sessionContext.currentIntensity || initialIntensity;
     const improvement = initialIntensity - newIntensity;
+    const roundImprovement = previousIntensity - newIntensity;
+    
+    // Track rounds without reduction
+    const noReduction = roundImprovement <= 0;
+    const roundsWithoutReduction = noReduction 
+      ? (sessionContext.roundsWithoutReduction || 0) + 1 
+      : 0;
+    
+    // Determine reminder phrase type for next round
+    let phraseType: 'acknowledging' | 'partial-release' | 'full-release';
+    if (newIntensity > 3) {
+      phraseType = 'acknowledging';
+    } else if (roundImprovement >= 3 && roundImprovement <= 5) {
+      phraseType = 'partial-release';
+    } else {
+      phraseType = 'full-release';
+    }
+    
+    // Update context with tracking info
+    const updatedContext = {
+      ...sessionContext,
+      currentIntensity: newIntensity,
+      roundsWithoutReduction,
+      reminderPhraseType: phraseType,
+      previousIntensities: [...(sessionContext.previousIntensities || []), newIntensity]
+    };
+    setSessionContext(updatedContext);
+    onSessionUpdate(updatedContext);
     
     // Decision logic based on intensity
     if (newIntensity === 0) {
@@ -517,29 +559,29 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       console.log('[useAIChat] Intensity is 0 - completing session and transitioning to advice');
       
       await completeTappingSession(newIntensity);
-      
-      // First transition to advice state
       onStateChange('advice');
       
-      // Then request advice from AI (now in 'advice' state, won't be intercepted)
       await sendMessage(
         `My intensity is now 0/10. Initial was ${initialIntensity}/10.`,
         'advice',
         { currentIntensity: 0 }
       );
       
-    } else if (newIntensity <= 2) {
-      // Very low - offer user a choice
-      console.log('[useAIChat] Intensity is low (≤2) - offering choice');
+    } else {
+      // Show post-tapping choice UI (handles all cases: low intensity, high intensity, no reduction)
+      console.log('[useAIChat] Showing post-tapping choice UI');
       
-      // Add a system message with choice buttons
       const choiceMessage: Message = {
         id: `choice-${Date.now()}`,
         type: 'system',
         content: JSON.stringify({
-          type: 'continue-choice',
+          type: 'post-tapping-choice',
           intensity: newIntensity,
-          improvement: improvement
+          initialIntensity,
+          improvement,
+          round: sessionContext.round || 1,
+          roundsWithoutReduction,
+          phraseType
         }),
         timestamp: new Date(),
         sessionId: currentChatSession
@@ -547,15 +589,35 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       
       setMessages(prev => [...prev, choiceMessage]);
       setConversationHistory(prev => [...prev, choiceMessage]);
-      
-  } else {
-    // Still significant - automatically start another round
-    console.log('[useAIChat] Intensity still high (>2) - starting new round');
+    }
+  }, [sessionContext, currentChatSession, messages, onStateChange, sendMessage, setConversationHistory, setMessages, completeTappingSession, onSessionUpdate]);
+
+  // Handle "Talk to Tapaway" - go back to conversation for deeper inquiry
+  const handleTalkToTapaway = useCallback(async () => {
+    console.log('[useAIChat] User chose to talk to Tapaway for deeper inquiry');
     
-    // Start new tapping round directly (it has its own message)
-    startNewTappingRound(newIntensity);
-  }
-  }, [sessionContext, currentChatSession, messages, onStateChange, sendMessage, setConversationHistory, setMessages, startNewTappingRound]);
+    const updatedContext = {
+      ...sessionContext,
+      returningFromTapping: true,
+      deepeningLevel: (sessionContext.deepeningLevel || 0) + 1
+    };
+    setSessionContext(updatedContext);
+    onSessionUpdate(updatedContext);
+    
+    // Add a message to indicate we're going back to chat
+    const transitionMessage: Message = {
+      id: `transition-${Date.now()}`,
+      type: 'bot',
+      content: `Let's explore this a bit more. What else is on your mind about this ${sessionContext.feeling || 'feeling'}? Sometimes there's more underneath the surface.`,
+      timestamp: new Date(),
+      sessionId: currentChatSession
+    };
+    
+    setMessages(prev => [...prev, transitionMessage]);
+    setConversationHistory(prev => [...prev, transitionMessage]);
+    
+    onStateChange('conversation');
+  }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate]);
 
   const determineNextState = (currentState: ChatState, aiResponse: string): ChatState | null => {
     console.log('[determineNextState] FALLBACK LOGIC - Current state:', currentState);
@@ -662,6 +724,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     intensityHistory,
     startNewTappingRound,
     handlePostTappingIntensity,
-    completeTappingSession
+    completeTappingSession,
+    handleTalkToTapaway
   };
 };

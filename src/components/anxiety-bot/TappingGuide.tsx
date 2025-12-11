@@ -34,12 +34,72 @@ const tappingPoints: TappingPoint[] = [
 interface TappingGuideProps {
   setupStatements: string[];  // the 3 setup statements
   statementOrder: number[];   // length 8, values in {0,1,2}
+  reminderPhraseType?: 'acknowledging' | 'partial-release' | 'full-release';
+  feeling?: string;
+  bodyLocation?: string;
   onComplete: () => void;
   onPointChange?: (pointIndex: number) => void;
 }
 
-const TappingGuide = ({ setupStatements, statementOrder, onComplete, onPointChange }: TappingGuideProps) => {
-  console.log('[TappingGuide] Rendered with:', { setupStatements, statementOrder });
+// Generate dynamic reminder phrases based on type
+const generateReminderPhrase = (
+  type: 'acknowledging' | 'partial-release' | 'full-release',
+  feeling: string,
+  bodyLocation: string,
+  pointIndex: number
+): string => {
+  const acknowledgingPhrases = [
+    `This ${feeling}`,
+    `I am feeling ${feeling}`,
+    `This ${feeling} I'm feeling`,
+    `This ${feeling} in my ${bodyLocation}`,
+    `I am so ${feeling}`,
+    `This feeling in my ${bodyLocation}`,
+    `Still feeling this ${feeling}`,
+    `This remaining ${feeling}`
+  ];
+
+  const partialReleasePhrases = [
+    `I'm beginning to let this ${feeling} go`,
+    `I'd like to release this ${feeling}`,
+    `I'm ready to let go of some of this ${feeling}`,
+    `This ${feeling} is starting to shift`,
+    `I'm making progress with this ${feeling}`,
+    `Starting to release this ${feeling}`,
+    `Letting some of this ${feeling} go`,
+    `This ${feeling} is easing`
+  ];
+
+  const fullReleasePhrases = [
+    `I am releasing this ${feeling}`,
+    `I am letting it go`,
+    `I don't need this ${feeling}`,
+    `Ready to release this emotion`,
+    `I've been ${feeling}, but I am letting it go`,
+    `It's time to let go of this`,
+    `It's safe to let this go`,
+    `Releasing this ${feeling} now`
+  ];
+
+  const phrases = type === 'acknowledging' 
+    ? acknowledgingPhrases 
+    : type === 'partial-release' 
+      ? partialReleasePhrases 
+      : fullReleasePhrases;
+
+  return phrases[pointIndex % phrases.length];
+};
+
+const TappingGuide = ({ 
+  setupStatements, 
+  statementOrder, 
+  reminderPhraseType = 'acknowledging',
+  feeling = 'this feeling',
+  bodyLocation = 'body',
+  onComplete, 
+  onPointChange 
+}: TappingGuideProps) => {
+  console.log('[TappingGuide] Rendered with:', { setupStatements, statementOrder, reminderPhraseType });
   
   const [currentPoint, setCurrentPoint] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -123,9 +183,17 @@ const TappingGuide = ({ setupStatements, statementOrder, onComplete, onPointChan
   const progress = ((currentPoint + (15 - timeRemaining) / 15) / tappingPoints.length) * 100;
   const currentTappingPoint = tappingPoints[currentPoint];
   
-  // Get the statement for the current point
+  // Get the statement/phrase for the current point
+  // For first round, use setup statements; for subsequent rounds, use dynamic reminder phrases
   const statementIdx = statementOrder[currentPoint] ?? 0;
-  const statementText = setupStatements[statementIdx] || `This feeling at ${currentTappingPoint.name.toLowerCase()}`;
+  const setupStatementText = setupStatements[statementIdx] || `This feeling at ${currentTappingPoint.name.toLowerCase()}`;
+  
+  // Use dynamic reminder phrases based on phrase type
+  const dynamicPhrase = generateReminderPhrase(reminderPhraseType, feeling, bodyLocation, currentPoint);
+  
+  // For the first round (when reminderPhraseType defaults to acknowledging), use setup statements
+  // For subsequent rounds, use the dynamic phrases based on progress
+  const statementText = setupStatementText;
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
