@@ -11,6 +11,8 @@ import ChatHistory from "./anxiety-bot/ChatHistory";
 import SessionProgress from "./anxiety-bot/SessionProgress";
 import IntensitySlider from "./anxiety-bot/IntensitySlider";
 import TappingGuide from "./anxiety-bot/TappingGuide";
+import SetupPhase from "./anxiety-bot/SetupPhase";
+import PostTappingChoice from "./anxiety-bot/PostTappingChoice";
 import CrisisSupport from "./anxiety-bot/CrisisSupport";
 import ChatMessage from "./anxiety-bot/ChatMessage";
 import LoadingIndicator from "./anxiety-bot/LoadingIndicator";
@@ -51,7 +53,8 @@ const AIAnxietyBot = () => {
     intensityHistory,
     startNewTappingRound,
     handlePostTappingIntensity,
-    completeTappingSession
+    completeTappingSession,
+    handleTalkToTapaway
   } = useAIChat({
     onStateChange: (newState) => {
       console.log('State change:', chatState, '->', newState);
@@ -167,9 +170,9 @@ const AIAnxietyBot = () => {
     // Don't set state here - let TappingGuide's onComplete handle transition to tapping-breathing
   };
 
-  const handleContinueTapping = async (intensity: number) => {
+  const handleContinueTapping = async (intensity: number, phraseType?: 'acknowledging' | 'partial-release' | 'full-release') => {
     console.log('[AIAnxietyBot] User chose to continue tapping');
-    await startNewTappingRound(intensity);
+    await startNewTappingRound(intensity, phraseType);
   };
 
   const handleEndSession = async () => {
@@ -196,6 +199,31 @@ const AIAnxietyBot = () => {
   const renderInput = () => {
     // Debug: log current state
     console.log('Current chat state:', chatState);
+    
+    // Setup phase - karate chop with setup statements
+    if (chatState === 'setup') {
+      console.log('[AIAnxietyBot] 🎯 Rendering setup phase');
+      
+      if (!sessionContext.setupStatements || sessionContext.setupStatements.length === 0) {
+        return (
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg space-y-3">
+            <p className="text-sm font-semibold text-destructive mb-1">
+              ⚠️ Missing Setup Statements
+            </p>
+            <Button onClick={startNewSession} size="sm" variant="outline">
+              Start New Session
+            </Button>
+          </div>
+        );
+      }
+      
+      return (
+        <SetupPhase
+          setupStatements={sessionContext.setupStatements}
+          onComplete={() => setChatState('tapping-point')}
+        />
+      );
+    }
     
     // Progressive tapping states with intensity sliders
     if (chatState === 'gathering-intensity' || chatState === 'post-tapping') {
@@ -273,6 +301,9 @@ const AIAnxietyBot = () => {
           <TappingGuide
             setupStatements={sessionContext.setupStatements}
             statementOrder={sessionContext.statementOrder || [0, 1, 2, 0, 1, 2, 0, 1]}
+            reminderPhraseType={sessionContext.reminderPhraseType || 'acknowledging'}
+            feeling={sessionContext.feeling || 'this feeling'}
+            bodyLocation={sessionContext.bodyLocation || 'body'}
             onComplete={() => setChatState('tapping-breathing')}
             onPointChange={setCurrentTappingPoint}
           />
@@ -366,6 +397,24 @@ const AIAnxietyBot = () => {
                     if (message.type === 'system') {
                       try {
                         const parsed = JSON.parse(message.content);
+                        
+                        // New post-tapping choice component
+                        if (parsed.type === 'post-tapping-choice') {
+                          return (
+                            <PostTappingChoice
+                              key={message.id}
+                              intensity={parsed.intensity}
+                              initialIntensity={parsed.initialIntensity}
+                              round={parsed.round}
+                              roundsWithoutReduction={parsed.roundsWithoutReduction}
+                              onContinueTapping={() => handleContinueTapping(parsed.intensity, parsed.phraseType)}
+                              onTalkToTapaway={handleTalkToTapaway}
+                              onEndSession={handleEndSession}
+                            />
+                          );
+                        }
+                        
+                        // Legacy continue-choice (keep for backwards compatibility)
                         if (parsed.type === 'continue-choice') {
                           return (
                             <div key={message.id} className="space-y-3 p-4 bg-secondary/20 rounded-lg">
