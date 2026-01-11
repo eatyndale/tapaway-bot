@@ -92,6 +92,188 @@ export type Database = {
         }
         Relationships: []
       }
+      evaluation_results: {
+        Row: {
+          created_at: string | null
+          crisis_detected: boolean | null
+          crisis_match: boolean | null
+          directive_valid: boolean | null
+          error_message: string | null
+          id: string
+          input_tokens: number | null
+          intent_match: boolean | null
+          json_parse_success: boolean | null
+          latency_ms: number | null
+          model: string
+          output_tokens: number | null
+          response_content: string | null
+          run_id: string | null
+          test_case_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          crisis_detected?: boolean | null
+          crisis_match?: boolean | null
+          directive_valid?: boolean | null
+          error_message?: string | null
+          id?: string
+          input_tokens?: number | null
+          intent_match?: boolean | null
+          json_parse_success?: boolean | null
+          latency_ms?: number | null
+          model: string
+          output_tokens?: number | null
+          response_content?: string | null
+          run_id?: string | null
+          test_case_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          crisis_detected?: boolean | null
+          crisis_match?: boolean | null
+          directive_valid?: boolean | null
+          error_message?: string | null
+          id?: string
+          input_tokens?: number | null
+          intent_match?: boolean | null
+          json_parse_success?: boolean | null
+          latency_ms?: number | null
+          model?: string
+          output_tokens?: number | null
+          response_content?: string | null
+          run_id?: string | null
+          test_case_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_results_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_results_test_case_id_fkey"
+            columns: ["test_case_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_test_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evaluation_runs: {
+        Row: {
+          completed_at: string | null
+          id: string
+          models_tested: string[]
+          name: string
+          started_at: string | null
+          status: string
+          test_case_count: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          models_tested: string[]
+          name: string
+          started_at?: string | null
+          status?: string
+          test_case_count?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          models_tested?: string[]
+          name?: string
+          started_at?: string | null
+          status?: string
+          test_case_count?: number | null
+        }
+        Relationships: []
+      }
+      evaluation_test_cases: {
+        Row: {
+          category: string
+          conversation_state: string | null
+          created_at: string | null
+          expected_crisis: boolean | null
+          expected_directive_type: string | null
+          expected_intent: string | null
+          id: string
+          input_message: string
+          metadata: Json | null
+          source: string
+        }
+        Insert: {
+          category: string
+          conversation_state?: string | null
+          created_at?: string | null
+          expected_crisis?: boolean | null
+          expected_directive_type?: string | null
+          expected_intent?: string | null
+          id?: string
+          input_message: string
+          metadata?: Json | null
+          source: string
+        }
+        Update: {
+          category?: string
+          conversation_state?: string | null
+          created_at?: string | null
+          expected_crisis?: boolean | null
+          expected_directive_type?: string | null
+          expected_intent?: string | null
+          id?: string
+          input_message?: string
+          metadata?: Json | null
+          source?: string
+        }
+        Relationships: []
+      }
+      human_evaluations: {
+        Row: {
+          comments: string | null
+          created_at: string | null
+          empathy_score: number | null
+          id: string
+          language_score: number | null
+          overall_score: number | null
+          protocol_score: number | null
+          rater_id: string
+          result_id: string | null
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string | null
+          empathy_score?: number | null
+          id?: string
+          language_score?: number | null
+          overall_score?: number | null
+          protocol_score?: number | null
+          rater_id: string
+          result_id?: string | null
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string | null
+          empathy_score?: number | null
+          id?: string
+          language_score?: number | null
+          overall_score?: number | null
+          protocol_score?: number | null
+          rater_id?: string
+          result_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "human_evaluations_result_id_fkey"
+            columns: ["result_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           age_group: string | null
