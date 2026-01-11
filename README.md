@@ -1,256 +1,346 @@
+# Tapaway
 
-# Anxiety Reduction App
+**AI-Powered EFT Tapping for Anxiety Relief**
 
-A React-based web application that helps users manage anxiety through EFT (Emotional Freedom Technique) tapping sessions and personalized guidance.
+A React-based web application that guides users through Emotional Freedom Techniques (EFT) tapping sessions using an AI conversational agent, designed to reduce anxiety through structured, evidence-based interventions.
 
-## 🌟 Overview
+---
 
-This application provides a comprehensive anxiety management solution featuring:
-- PHQ-9 health assessment questionnaire
-- Interactive EFT tapping assistant with guided sessions
-- Personalized advice based on user progress
-- Session history tracking
-- Clean, responsive UI built with modern React and Tailwind CSS
+## Overview
 
-## 🏗️ Architecture
+Tapaway is a digital mental health tool developed as part of a Design Science Research (DSR) project investigating the efficacy of AI-delivered EFT interventions. The application combines conversational AI with the clinical EFT protocol to provide accessible, personalized anxiety relief.
 
-The application follows a component-based architecture with clear separation of concerns:
+### Key Outcomes
+- **Mean SUDS Reduction**: 4.28 points (from 7.22 to 2.94)
+- **Effect Size**: Cohen's d = 2.16 [95% CI: 1.61, 2.71]
+- **Completion Rate**: 68 completed sessions
+
+---
+
+## Features
+
+- **PHQ-9 Style Assessment** - Initial anxiety screening with severity classification
+- **AI-Guided EFT Sessions** - Conversational agent guides users through the clinical EFT protocol
+- **Interactive Tapping Guide** - Visual demonstrations with GIF animations for each tapping point
+- **SUDS Tracking** - Pre/post session intensity ratings (0-10 scale)
+- **Crisis Detection** - Automatic detection of crisis language with professional referral
+- **Session History** - Persistent storage of all tapping sessions with improvement metrics
+- **Secure Authentication** - Supabase Auth with email/password and magic link support
+- **Responsive Design** - Mobile-first design optimized for accessibility
+
+---
+
+## Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | React 18, TypeScript, Vite |
+| **Styling** | Tailwind CSS, Radix UI, Shadcn/ui |
+| **Backend** | Supabase (Auth, PostgreSQL, Edge Functions) |
+| **AI** | OpenAI GPT-4o-mini with Bounded Generative Framework |
+| **State Management** | TanStack React Query |
+| **Routing** | React Router v6 |
+
+---
+
+## Project Structure
 
 ```
-src/
-├── components/           # Reusable UI components
-│   ├── anxiety-bot/     # EFT tapping assistant components
-│   └── ui/              # Shadcn/ui components
-├── hooks/               # Custom React hooks
-├── lib/                 # Utility libraries
-└── pages/               # Main application pages
+├── public/
+│   ├── audio/                    # Ambient tapping audio
+│   └── lovable-uploads/          # Uploaded assets
+├── src/
+│   ├── assets/tapping/           # Tapping point GIFs and images
+│   ├── components/
+│   │   ├── anxiety-bot/          # AI chatbot components
+│   │   │   ├── ChatInterface.tsx # Main chat UI
+│   │   │   ├── TappingGuide.tsx  # Visual tapping instructions
+│   │   │   ├── SetupPhase.tsx    # EFT setup statements
+│   │   │   ├── IntensitySlider.tsx # SUDS rating input
+│   │   │   └── CrisisSupport.tsx # Crisis intervention display
+│   │   ├── ui/                   # Shadcn/ui components
+│   │   ├── AIAnxietyBot.tsx      # Main bot orchestrator
+│   │   ├── AuthForm.tsx          # Authentication UI
+│   │   ├── Dashboard.tsx         # User dashboard
+│   │   ├── Questionnaire.tsx     # PHQ-9 assessment
+│   │   └── TappingSequence.tsx   # Tapping flow manager
+│   ├── hooks/
+│   │   ├── useAIChat.ts          # AI conversation hook
+│   │   └── use-mobile.tsx        # Mobile detection
+│   ├── pages/
+│   │   ├── Index.tsx             # Landing/auth page
+│   │   └── AuthCallback.tsx      # OAuth callback handler
+│   ├── services/
+│   │   └── supabaseService.ts    # Database operations
+│   └── utils/
+│       ├── inputValidation.ts    # Input sanitization
+│       ├── secureStorage.ts      # Secure local storage
+│       └── spellChecker.ts       # Text correction
+├── supabase/
+│   ├── functions/
+│   │   └── eft-chat/             # AI conversation edge function
+│   └── migrations/               # Database schema migrations
+└── METHODOLOGY_*.md              # Research documentation
 ```
 
-## 📁 File Structure & Descriptions
+---
 
-### Root Configuration Files
-- `package.json` - Project dependencies and scripts
-- `tsconfig.json` - TypeScript configuration
-- `tailwind.config.ts` - Tailwind CSS configuration
-- `vite.config.ts` - Vite build tool configuration
-- `components.json` - Shadcn/ui component configuration
+## Getting Started
 
-### Main Application Files
+### Prerequisites
 
-#### `src/App.tsx`
-Main application router and layout. Handles routing between different pages using React Router.
+- Node.js 18+ or Bun
+- Supabase account and project
+- OpenAI API key
 
-#### `src/main.tsx`
-Application entry point. Sets up React root and renders the main App component.
+### Installation
 
-#### `src/index.css`
-Global CSS styles and Tailwind imports.
+```bash
+# Clone the repository
+git clone <repository-url>
+cd tapaway
 
-### Pages (`src/pages/`)
+# Install dependencies
+npm install
+# or
+bun install
 
-#### `src/pages/Index.tsx`
-Landing page that serves as the main entry point. Handles user authentication flow and displays welcome content.
+# Start development server
+npm run dev
+```
 
-#### `src/pages/NotFound.tsx`
-404 error page for handling invalid routes.
+### Environment Variables
 
-### Core Components (`src/components/`)
+Create a `.env` file with:
 
-#### `src/components/AuthForm.tsx`
-Authentication component handling both login and signup flows. Features:
-- Toggle between login/signup modes
-- Form validation
-- Responsive design with gradient styling
-- TODO: Supabase integration for actual authentication
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-#### `src/components/Dashboard.tsx`
-Main dashboard component that orchestrates the user experience. Manages:
-- Navigation between different app states (welcome, questionnaire, bot, at-risk)
-- User profile state
-- Crisis intervention for at-risk users
-- Session routing and back navigation
+Configure the following secret in Supabase Edge Functions:
 
-#### `src/components/Questionnaire.tsx`
-PHQ-9 depression screening questionnaire implementation. Features:
-- Step-by-step question flow
-- Progress tracking
-- Score calculation
-- Risk assessment for self-harm indicators
-- Professional help recommendations
+- `OPENAI_API_KEY` - OpenAI API key for GPT-4o-mini
 
-#### `src/components/AnxietyBot.tsx`
-Main anxiety reduction chat interface. Orchestrates the entire EFT tapping process:
-- Session management and state transitions
-- Message handling and chat flow
-- Tapping sequence coordination
-- Progress tracking across multiple rounds
-- Session history persistence in localStorage
+---
 
-#### `src/components/TappingSequence.tsx`
-Standalone tapping sequence component (alternative implementation). Provides:
-- Setup statement generation
-- Guided tapping with timers
-- Progress tracking through rounds
-- Breathing exercises
-- Intensity rating system
+## Database Schema
 
-### Anxiety Bot Components (`src/components/anxiety-bot/`)
+### Tables
 
-#### `src/components/anxiety-bot/types.ts`
-TypeScript type definitions for the anxiety bot system:
-- `ChatState` - Defines all possible conversation states
-- `ChatSession` - Session data structure
-- `Message` - Individual message structure
+| Table | Purpose |
+|-------|---------|
+| `profiles` | User profile data (name, email, age_group, industry) |
+| `assessments` | PHQ-9 assessment results with severity classification |
+| `chat_sessions` | AI conversation history with crisis detection flags |
+| `tapping_sessions` | EFT session data with intensity ratings and improvement metrics |
 
-#### `src/components/anxiety-bot/ChatInterface.tsx`
-Main chat interface component handling:
-- Message rendering and display
-- User input collection (text, sliders, selections)
-- Setup statement selection
-- Tapping point guidance
-- Dynamic input types based on conversation state
+### Key Fields in `tapping_sessions`
 
-#### `src/components/anxiety-bot/AdviceDisplay.tsx`
-Renders personalized advice based on user progress:
-- Progress-based advice generation
-- Different advice tiers based on improvement percentage
-- Encouraging messages and actionable recommendations
-- Session completion handling
+```sql
+- problem: text           -- User's stated concern
+- feeling: text           -- Emotional label
+- body_location: text     -- Somatic sensation location
+- initial_intensity: int  -- Pre-session SUDS (0-10)
+- final_intensity: int    -- Post-session SUDS (0-10)
+- improvement: int        -- Calculated reduction
+- rounds_completed: int   -- Number of tapping rounds
+- setup_statements: text[] -- Personalized affirmations
+- reminder_phrases: text[] -- Tapping point phrases
+```
 
-#### `src/components/anxiety-bot/SessionProgress.tsx`
-Displays current session information and progress tracking:
-- Session details (problem, feeling, location, intensity)
-- Round progression
-- Visual progress indicators
+---
 
-#### `src/components/anxiety-bot/ChatHistory.tsx`
-Manages and displays previous chat sessions:
-- Session list with timestamps
-- Session loading functionality
-- Clean, organized history display
+## Edge Functions
 
-#### `src/components/anxiety-bot/SessionComplete.tsx`
-Final session completion screen:
-- Session summary
-- Options for new sessions
-- History access
+### `eft-chat`
 
-### UI Components (`src/components/ui/`)
+The core AI conversation handler implementing the Bounded Generative Framework.
 
-The `ui/` directory contains Shadcn/ui components providing consistent design system:
+**Endpoint**: `POST /functions/v1/eft-chat`
 
-#### Core Components
-- `button.tsx` - Customizable button component with variants
-- `card.tsx` - Card container with header, content, and description
-- `input.tsx` - Form input fields
-- `textarea.tsx` - Multi-line text input
-- `slider.tsx` - Range slider for intensity ratings
-- `progress.tsx` - Progress bar component
+**Request Body**:
+```json
+{
+  "message": "string",
+  "conversationHistory": [],
+  "sessionContext": {
+    "problem": "string",
+    "feeling": "string",
+    "bodyLocation": "string",
+    "intensity": 0,
+    "currentRound": 1,
+    "conversationState": "conversation"
+  }
+}
+```
 
-#### Layout & Navigation
-- `scroll-area.tsx` - Custom scrollable areas
-- `separator.tsx` - Visual dividers
-- `badge.tsx` - Status and category badges
+**Response**:
+```json
+{
+  "response": "string",
+  "directive": {
+    "type": "continue_conversation | gather_intensity | start_tapping | ...",
+    "data": {}
+  },
+  "intent": "string",
+  "updatedContext": {},
+  "isCrisis": false
+}
+```
 
-#### Form Components
-- `label.tsx` - Form field labels
-- `radio-group.tsx` - Radio button groups
-- `checkbox.tsx` - Checkbox inputs
-- `form.tsx` - Form wrapper and validation
+**Conversation States**:
+1. `conversation` - Initial problem gathering
+2. `gathering-intensity` - SUDS rating collection
+3. `setup` - Setup statement presentation
+4. `tapping-point` - Active tapping guidance
+5. `tapping-breathing` - Breathing exercises
+6. `post-tapping` - Post-round assessment
+7. `advice` - Session conclusion
 
-#### Feedback Components
-- `toast.tsx` - Toast notification system
-- `alert.tsx` - Alert messages
-- `skeleton.tsx` - Loading state placeholders
+---
 
-#### Interactive Components
-- `dialog.tsx` - Modal dialogs
-- `dropdown-menu.tsx` - Dropdown menus
-- `popover.tsx` - Popover overlays
-- `tooltip.tsx` - Hover tooltips
+## EFT Tapping Process Flow
 
-### Utility Files
+```
+┌─────────────────┐
+│  Start Session  │
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│ Identify Problem│◄──── AI guides discovery
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│ Rate Intensity  │◄──── SUDS 0-10
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│  Setup Phase    │◄──── "Even though I feel [X]..."
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│ Tapping Points  │◄──── 9 points with visual guides
+│  (8 per round)  │
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│ Deep Breathing  │
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│  Re-rate SUDS   │
+└────────┬────────┘
+         ▼
+    ┌────┴────┐
+    │ SUDS≤2? │
+    └────┬────┘
+    No   │   Yes
+    │    │    │
+    ▼    │    ▼
+┌───────┐│┌─────────┐
+│Another││ │Complete │
+│ Round │││ Session │
+└───┬───┘│└─────────┘
+    │    │
+    └────┘
+```
 
-#### `src/lib/utils.ts`
-Utility functions including class name merging for Tailwind CSS.
+---
 
-#### `src/hooks/use-toast.ts`
-Custom hook for toast notifications.
+## Key Design Principles
 
-#### `src/hooks/use-mobile.tsx`
-Hook for detecting mobile devices and responsive behavior.
+### 1. Bounded Generativity
+The AI operates within strict therapeutic boundaries defined by the Clinical EFT protocol. Responses are constrained to the current conversation state to ensure protocol fidelity.
 
-#### `src/components/ui/use-toast.ts`
-Toast hook re-export for consistent importing.
+### 2. Somatic Recognition
+The system explicitly acknowledges physical manifestations of anxiety, asking users to identify where they feel sensations in their body (e.g., "tight chest", "knot in stomach").
 
-## 🔧 Key Features
+### 3. Linguistic Attunement
+Setup statements and reminder phrases use the user's own words verbatim, maintaining authenticity and personal relevance:
+> "Even though I feel [user's feeling] about [user's problem], I deeply and completely accept myself."
 
-### 1. EFT Tapping Assistant
-- **Guided Sessions**: Step-by-step tapping instruction
-- **Adaptive Content**: Statements adjust based on user input and round number
-- **Progress Tracking**: Intensity monitoring throughout sessions
-- **Multiple Rounds**: Continues until significant improvement or completion
+### 4. Crisis Detection Architecture
+Real-time monitoring for crisis indicators (suicidal ideation, self-harm) with immediate escalation to professional resources. The AI provides crisis hotlines and encourages professional help.
 
-### 2. Health Assessment
-- **PHQ-9 Integration**: Standardized depression screening
-- **Risk Detection**: Identifies users who may need professional help
-- **Crisis Intervention**: Direct links to mental health resources
+### 5. Context Persistence
+Session context flows through the entire conversation, maintaining coherence across multiple tapping rounds and enabling personalized guidance.
 
-### 3. Personalized Experience
-- **Custom Advice**: Tailored recommendations based on progress
-- **Session History**: Persistent storage of past sessions
-- **Adaptive Flow**: Different paths for different risk levels
+---
 
-### 4. Professional Design
-- **Responsive Layout**: Works on all device sizes
-- **Accessibility**: Proper contrast, labels, and navigation
-- **Modern UI**: Clean design with gradient accents and smooth animations
+## Research Context
 
-## 🚀 Getting Started
+This application was developed as part of a Design Science Research project investigating:
 
-1. **Install Dependencies**
-   ```bash
-   npm install
-   ```
+- **RQ1**: Can AI-delivered EFT achieve therapeutic outcomes comparable to human-delivered formats?
+- **RQ2**: What design principles enable effective AI-mediated somatic interventions?
 
-2. **Start Development Server**
-   ```bash
-   npm run dev
-   ```
+### Key Findings
 
-3. **Build for Production**
-   ```bash
-   npm run build
-   ```
+| Metric | Value |
+|--------|-------|
+| Sample Size | n = 68 completed sessions |
+| Mean Initial SUDS | 7.22 (SD = 1.64) |
+| Mean Final SUDS | 2.94 (SD = 2.36) |
+| Mean Improvement | 4.28 points |
+| Cohen's d | 2.16 [95% CI: 1.61, 2.71] |
 
-## 🔮 Future Enhancements
+The effect size falls within the range of human-delivered EFT meta-analyses (Clond, 2016: d = 1.23 [0.82, 1.64]), suggesting AI-delivered EFT produces effects at least comparable to traditional formats.
 
-- **Supabase Integration**: User authentication and data persistence
-- **Advanced Analytics**: Progress tracking over time
-- **Social Features**: Sharing progress with support networks
-- **Therapist Integration**: Professional oversight and guidance
-- **Mobile App**: Native mobile application
+---
 
-## 🎨 Design System
+## Tapping Points
 
-The application uses a consistent design system with:
-- **Primary Color**: `#94c11f` (green accent)
-- **Gradients**: Blue to green transitions
-- **Typography**: Clean, readable fonts with proper hierarchy
-- **Spacing**: Consistent padding and margins using Tailwind classes
-- **Components**: Shadcn/ui for consistent, accessible components
+The application guides users through 9 tapping points:
 
-## 🧠 EFT Tapping Process
+1. **Karate Chop** - Side of hand (setup point)
+2. **Eyebrow** - Inner edge of eyebrow
+3. **Side of Eye** - Outer corner of eye
+4. **Under Eye** - On cheekbone under eye
+5. **Under Nose** - Between nose and upper lip
+6. **Chin** - Between lower lip and chin
+7. **Collarbone** - Just below collarbone
+8. **Under Arm** - About 4 inches below armpit
+9. **Top of Head** - Crown of head
 
-The application implements a complete EFT tapping workflow:
+Each point includes animated GIF demonstrations for proper technique.
 
-1. **Problem Identification**: User describes their anxiety trigger
-2. **Emotional Mapping**: Identifies specific feelings and body locations
-3. **Intensity Rating**: 0-10 scale assessment
-4. **Setup Statements**: Three personalized affirmations
-5. **Tapping Sequence**: Eight specific acupressure points
-6. **Progress Check**: Re-assessment of intensity
-7. **Iterative Rounds**: Continues until satisfactory improvement
-8. **Personalized Advice**: Custom guidance based on results
+---
 
-This systematic approach ensures users receive comprehensive support for anxiety management through evidence-based EFT techniques.
+## Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Code Style
+
+- TypeScript strict mode
+- ESLint configuration provided
+- Tailwind CSS for styling (use semantic tokens)
+- Component-based architecture with custom hooks
+
+---
+
+## License
+
+This project is part of academic research. Please contact the author for licensing information.
+
+---
+
+## Acknowledgments
+
+- **EFT Protocol**: Based on Clinical EFT as described by Church (2013)
+- **Meta-Analysis Reference**: Clond, M. (2016). Emotional Freedom Techniques for Anxiety
+- **UI Components**: [Shadcn/ui](https://ui.shadcn.com/)
+- **Backend**: [Supabase](https://supabase.com/)
+
+---
+
+## Support
+
+For issues or questions, please open a GitHub issue or contact the research team.
