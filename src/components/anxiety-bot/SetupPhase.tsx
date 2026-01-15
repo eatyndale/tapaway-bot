@@ -14,23 +14,13 @@ const SECONDS_PER_STATEMENT = 15; // 15 seconds per statement as per spec
 
 const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
   const [currentStatement, setCurrentStatement] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true); // Auto-start
+  const [isPlaying, setIsPlaying] = useState(false); // Don't auto-start
+  const [hasStarted, setHasStarted] = useState(false); // Track if user started
   const [timeRemaining, setTimeRemaining] = useState(SECONDS_PER_STATEMENT);
   const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const hasAutoStarted = useRef(false);
 
   console.log('[SetupPhase] Rendered with statements:', setupStatements);
-  
-  // Auto-start audio on mount
-  useEffect(() => {
-    if (!hasAutoStarted.current && audioRef.current) {
-      hasAutoStarted.current = true;
-      audioRef.current.play().catch((err) => {
-        console.log('[SetupPhase] Auto-play blocked by browser, user can unmute:', err);
-      });
-    }
-  }, []);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -68,6 +58,16 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
         audioRef.current.currentTime = 0;
       }
       onComplete();
+    }
+  };
+
+  const handleStart = () => {
+    setHasStarted(true);
+    setIsPlaying(true);
+    if (audioRef.current) {
+      audioRef.current.play().catch((err) => {
+        console.log('[SetupPhase] Audio play blocked by browser:', err);
+      });
     }
   };
 
@@ -163,7 +163,12 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
 
         {/* Controls */}
         <div className="flex justify-center space-x-3">
-          {isPlaying ? (
+          {!hasStarted ? (
+            <Button onClick={handleStart} className="flex items-center space-x-2" size="lg">
+              <Play className="w-5 h-5" />
+              <span>Start Setup</span>
+            </Button>
+          ) : isPlaying ? (
             <Button onClick={handlePause} variant="outline" className="flex items-center space-x-2">
               <Pause className="w-4 h-4" />
               <span>Pause</span>
