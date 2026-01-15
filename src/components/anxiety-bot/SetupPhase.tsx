@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
-import setupMeditationImg from "@/assets/setup-meditation.png";
+import setupMeditationImg from "@/assets/setup-meditation.gif";
 
 interface SetupPhaseProps {
   setupStatements: string[];
@@ -120,10 +120,10 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
 
         {/* Karate Chop Image with pulse animation when playing */}
         <div className="relative bg-gradient-to-b from-primary/5 to-secondary/5 rounded-lg p-6 flex items-center justify-center">
-          <div className={`relative w-full max-w-sm ${isPlaying ? 'setup-breathe-slow' : ''}`}>
+          <div className="relative w-full max-w-sm">
             <img 
               src={setupMeditationImg} 
-              alt="Meditation setup pose"
+              alt="Karate chop point tapping"
               className="w-full h-auto rounded-lg shadow-lg"
             />
             
