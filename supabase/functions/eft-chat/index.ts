@@ -1214,27 +1214,43 @@ Generate 3 EFT setup statements. Use the NOUN form of the emotion.`;
       } else if (isDeepeningEntry) {
         console.log('[eft-chat] Deepening ENTRY - generating first probing question');
         
-        // Reset question count on entry
+        // CRITICAL: Reset deepening context for fresh exploration
+        // Clear any previous deeper problem/feeling so we start fresh
         sessionContext.deepeningQuestionCount = 1;
+        sessionContext.previousDeeperProblem = sessionContext.problem; // Store for reference
+        sessionContext.previousDeeperFeeling = sessionContext.feeling; // Store for reference
         
-        const entryPrompt = `You are an EFT tapping therapist having a warm, supportive conversation.
+        // Use conversation history to get the LATEST context from this round
+        // NOT the accumulated deeper context from previous rounds
+        const currentRoundProblem = sessionContext.problem || 'their issue';
+        const currentRoundFeeling = sessionContext.feeling || 'distress';
+        const currentRound = sessionContext.round || 1;
+        
+        console.log('[eft-chat] Deepening entry - Round:', currentRound, 'Problem:', currentRoundProblem, 'Feeling:', currentRoundFeeling);
+        
+        const entryPrompt = `You are an EFT tapping therapist having a warm, supportive conversation with ${capitalizedName}.
 
-The user just finished a tapping round but their intensity didn't reduce much.
+${capitalizedName} just finished tapping round ${currentRound} but their intensity is still elevated.
+This is a NEW deepening exploration - we're looking for what's STILL holding onto this feeling.
+
 Current context:
-- Problem: "${sessionContext.problem || 'their issue'}"
-- Feeling: "${sessionContext.feeling || 'distress'}"
+- They were working on: "${currentRoundProblem}"
+- They were feeling: "${currentRoundFeeling}"
 - Body location: "${sessionContext.bodyLocation || 'body'}"
+- Current intensity: ${sessionContext.currentIntensity || 'still elevated'}/10
+- Round just completed: ${currentRound}
 
-Ask ONE warm, open-ended probing question to explore what's underneath this feeling.
-Be curious and gentle. Help them discover what's really going on.
+YOUR TASK: Ask ONE fresh, curious probing question to explore what's keeping this feeling stuck.
 
-Examples of good probing questions:
-- "What aspect of [problem] feels most heavy right now?"
-- "When you sit with this [feeling], what thoughts come up?"
-- "Is there something specific about [problem] that's weighing on you?"
-- "What does this [feeling] remind you of?"
+Since they've already tapped on this, explore DIFFERENT angles:
+- "That ${currentRoundFeeling} is still hanging on. What part of it feels most stubborn right now?"
+- "Sometimes after tapping, a different layer shows up. What are you noticing now?"
+- "Is there something about [problem] we haven't touched on yet?"
+- "What thought keeps coming back even after the tapping?"
 
-Do NOT ask for intensity. Do NOT suggest tapping yet. Just be curious.
+Be warm and curious. This is a FRESH exploration for this round.
+Do NOT assume you already know what's underneath - ASK.
+Do NOT suggest tapping yet. Do NOT ask for intensity.
 
 CRITICAL: End your response with exactly:
 <<DIRECTIVE {"next_state":"conversation-deepening","collect":"conversation"}>>`;
