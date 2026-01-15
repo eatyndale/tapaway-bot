@@ -113,31 +113,39 @@ export class SpellChecker {
   static correctWithFuzzyMatching(input: string): { corrected: string; changes: string[] } {
     if (!input || typeof input !== 'string') return { corrected: input, changes: [] };
     
-    const words = input.split(/(\s+|[^\w\s])/);
+    // Split on whitespace only, preserving contractions like "I'm", "you've"
+    const tokens = input.split(/(\s+)/);
     const changes: string[] = [];
     
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i];
-      if (/^\w+$/.test(word)) { // Only process actual words
-        // Try direct correction first
-        const directCorrection = this.anxietyTerms[word.toLowerCase()];
-        if (directCorrection && directCorrection !== word.toLowerCase()) {
-          words[i] = directCorrection;
-          changes.push(`"${word}" → "${directCorrection}"`);
-          continue;
-        }
-        
-        // Try fuzzy matching for unrecognized words
-        const fuzzyMatch = this.findBestMatch(word);
-        if (fuzzyMatch && fuzzyMatch !== word.toLowerCase()) {
-          words[i] = fuzzyMatch;
-          changes.push(`"${word}" → "${fuzzyMatch}"`);
-        }
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      // Skip whitespace tokens
+      if (/^\s+$/.test(token)) continue;
+      
+      // Extract the word part (without leading/trailing punctuation)
+      const match = token.match(/^([^\w]*)(\w+)([^\w]*)$/);
+      if (!match) continue;
+      
+      const [, prefix, word, suffix] = match;
+      
+      // Try direct correction first
+      const directCorrection = this.anxietyTerms[word.toLowerCase()];
+      if (directCorrection && directCorrection !== word.toLowerCase()) {
+        tokens[i] = prefix + directCorrection + suffix;
+        changes.push(`"${word}" → "${directCorrection}"`);
+        continue;
+      }
+      
+      // Try fuzzy matching for unrecognized words
+      const fuzzyMatch = this.findBestMatch(word);
+      if (fuzzyMatch && fuzzyMatch !== word.toLowerCase()) {
+        tokens[i] = prefix + fuzzyMatch + suffix;
+        changes.push(`"${word}" → "${fuzzyMatch}"`);
       }
     }
     
     return {
-      corrected: words.join(''),
+      corrected: tokens.join(''),
       changes
     };
   }
