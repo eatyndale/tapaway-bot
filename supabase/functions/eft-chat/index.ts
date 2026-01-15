@@ -516,6 +516,12 @@ serve(async (req) => {
     // For conversation state OR relevant messages - always extract and proceed
     console.log('[eft-chat] Extracting from history + current message (silent background extraction)');
 
+    // ============================================================================
+    // CRITICAL: Capture pre-merge values BEFORE any merging for deepening detection
+    // ============================================================================
+    const preMergeProblem = sessionContext.problem || '';
+    const preMergeFeeling = sessionContext.feeling || '';
+
     const historyExtraction = await extractFromHistory(conversationHistory, openAIApiKey);
     console.log('[eft-chat] History extraction:', JSON.stringify(historyExtraction));
 
@@ -1104,38 +1110,51 @@ I'm here whenever you need me. 💚
       // DEEPENING COMPLETION DETECTION
       // If the user reveals a deeper issue (new feeling or belief), generate setup
       // statements via tool calling and transition to setup (not gathering-intensity)
+      // MAX 2 QUESTIONS: After 2 user messages in deepening, auto-transition
       // ============================================================================
       console.log('[eft-chat] conversation-deepening: checking for deeper issue revelation');
       
-      const previousFeeling = sessionContext.feeling || '';
-      const previousProblem = sessionContext.problem || '';
+      // Count how many user messages occurred in deepening state
+      const deepeningAttempts = sessionContext.deepeningAttempts || 0;
+      const newDeepeningAttempts = deepeningAttempts + 1;
+      console.log('[eft-chat] Deepening attempts:', newDeepeningAttempts);
+      
+      // Use PRE-MERGE values (captured before line 524) to detect NEW information
       const newFeeling = classification.extracted?.feeling || '';
       const newProblem = classification.extracted?.problem || '';
       
-      // Detect if user revealed something deeper
-      const revealedDeeperFeeling = newFeeling && newFeeling !== previousFeeling && newFeeling.length > 0;
-      const revealedDeeperProblem = newProblem && newProblem !== previousProblem && newProblem.length > 0;
+      // Detect if user revealed something new (compare against pre-merge values)
+      const revealedDeeperFeeling = newFeeling && newFeeling.toLowerCase() !== preMergeFeeling.toLowerCase() && newFeeling.length > 0;
+      const revealedDeeperProblem = newProblem && newProblem.toLowerCase() !== preMergeProblem.toLowerCase() && newProblem.length > 0;
+      
+      // Also check if user gave a substantial response (even if extraction didn't catch it)
+      const hasSubstantialResponse = sanitizedMessage.length > 15;
+      
+      // Transition if: new info revealed OR 2+ attempts OR substantial response after 1 attempt
       const revealedDeeper = revealedDeeperFeeling || revealedDeeperProblem;
+      const shouldTransition = revealedDeeper || newDeepeningAttempts >= 2 || (hasSubstantialResponse && newDeepeningAttempts >= 1);
       
       console.log('[eft-chat] Deeper issue check:', {
-        previousFeeling, newFeeling, revealedDeeperFeeling,
-        previousProblem, newProblem, revealedDeeperProblem,
-        revealedDeeper
+        preMergeFeeling, preMergeProblem,
+        newFeeling, newProblem,
+        revealedDeeperFeeling, revealedDeeperProblem,
+        revealedDeeper, hasSubstantialResponse,
+        newDeepeningAttempts, shouldTransition
       });
       
-      if (revealedDeeper) {
+      if (shouldTransition) {
         // User revealed a deeper issue - generate setup statements via tool calling
         console.log('[eft-chat] ✅ Deeper issue revealed! Using tool calling for setup statements');
         
-        // Update session context with the new deeper values
-        const updatedProblem = newProblem || previousProblem;
-        const updatedFeeling = newFeeling || previousFeeling;
+        // Use the merged session context (which now includes the user's new info)
+        const updatedProblem = sessionContext.problem || preMergeProblem;
+        const updatedFeeling = sessionContext.feeling || preMergeFeeling;
         const bodyLocation = sessionContext.bodyLocation || 'body';
         
         const deepeningToolPrompt = `You are an EFT tapping therapist. The user has just revealed a deeper issue underneath their surface problem.
 
-Previous problem: "${previousProblem}"
-Previous feeling: "${previousFeeling}"
+Previous problem: "${preMergeProblem}"
+Previous feeling: "${preMergeFeeling}"
 
 NEW deeper insight from user: "${sanitizedMessage}"
 Extracted new problem: "${updatedProblem}"
@@ -1194,9 +1213,13 @@ The statements should acknowledge the deeper issue while maintaining self-accept
           };
           
           // SHORT visible response - no setup statements in chat!
-          aiResponse = `I see, ${capitalizedName} — this goes deeper. It's really about ${updatedFeeling !== previousFeeling ? `this ${updatedFeeling}` : updatedProblem}. Let's tap on this new layer.`;
+          const displayIssue = updatedFeeling !== preMergeFeeling ? `this ${updatedFeeling}` : updatedProblem;
+          aiResponse = `I see, ${capitalizedName} — this goes deeper. It's really about ${displayIssue}. Let's tap on this new layer.`;
           aiResponse += `\n\n<<DIRECTIVE ${JSON.stringify(extractedDirective)}>>`;
           
+          // Update sessionContext for extractedContext response
+          sessionContext.problem = updatedProblem;
+          sessionContext.feeling = updatedFeeling;
           console.log('[eft-chat] ✅ Deepening complete - transitioning to setup');
           console.log('[eft-chat] New statements:', toolArgs.setup_statements);
         } else {
