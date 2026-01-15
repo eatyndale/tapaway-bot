@@ -25,6 +25,7 @@ interface SessionContext {
   deepeningAttempts?: number;
   totalRoundsWithoutReduction?: number;
   isDeepeningEntry?: boolean;  // True when entering deepening (system context, not user message)
+  deepeningQuestionCount?: number; // Tracks how many probing questions asked in current deepening
 }
 
 interface Directive {
@@ -332,6 +333,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         if (data.extractedContext.currentIntensity !== undefined) {
           updatedContext.currentIntensity = data.extractedContext.currentIntensity;
         }
+        // Persist deepeningQuestionCount from server
+        if (data.extractedContext.deepeningQuestionCount !== undefined) {
+          updatedContext.deepeningQuestionCount = data.extractedContext.deepeningQuestionCount;
+        }
         setSessionContext(updatedContext);
         onSessionUpdate(updatedContext);
       }
@@ -635,12 +640,13 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       // Transition to dedicated deepening state (not regular conversation)
       onStateChange('conversation-deepening');
       
-      // Send ENTRY marker to get AI's first probing question
+      // Send MINIMAL entry marker to get AI's first probing question
       // This is NOT a user message - it's hidden system context
+      // CRITICAL: Keep marker minimal to avoid biasing AI evaluation
       await sendMessage(
-        `[DEEPENING_ENTRY] Intensity: ${newIntensity}/10. Problem: ${sessionContext.problem}. Feeling: ${sessionContext.feeling}.`,
+        `[DEEPENING_ENTRY]`,
         'conversation-deepening',
-        { ...deepeningContext, isDeepeningEntry: true }
+        { ...deepeningContext, isDeepeningEntry: true, deepeningQuestionCount: 0 }
       );
       
     } else {

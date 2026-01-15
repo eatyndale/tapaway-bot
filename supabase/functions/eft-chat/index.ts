@@ -1138,8 +1138,11 @@ I'm here whenever you need me. 💚
       );
       
       // Detect if this is the ENTRY point (auto-triggered, not a real user message)
-      const isDeepeningEntry = sanitizedMessage.includes('[DEEPENING_ENTRY]') || 
-                               sanitizedMessage.includes('My intensity is still at');
+      // CRITICAL: Use case-insensitive check since sanitizeInput may lowercase the message
+      const msgLower = sanitizedMessage.toLowerCase();
+      const isDeepeningEntry = sessionContext.isDeepeningEntry === true || 
+                               msgLower.includes('[deepening_entry]') ||
+                               msgLower.includes('deepening_entry');
       
       // Track question count
       const deepeningQuestionCount = sessionContext.deepeningQuestionCount || 0;
@@ -1738,7 +1741,8 @@ Examples:
         problem: sessionContext.problem,
         feeling: sessionContext.feeling,
         bodyLocation: sessionContext.bodyLocation,
-        currentIntensity: sessionContext.currentIntensity
+        currentIntensity: sessionContext.currentIntensity,
+        deepeningQuestionCount: sessionContext.deepeningQuestionCount || 0
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

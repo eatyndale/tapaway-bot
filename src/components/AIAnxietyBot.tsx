@@ -67,13 +67,8 @@ const AIAnxietyBot = () => {
       setShowCrisisSupport(true);
     },
     onTypoCorrection: (original, corrected) => {
-      if (original !== corrected) {
-        toast({
-          title: "Input Corrected",
-          description: `"${original}" → "${corrected}"`,
-          duration: 3000,
-        });
-      }
+      // Silently apply corrections - no toast notification
+      console.log('[AIAnxietyBot] Typo corrected:', original, '->', corrected);
     }
   });
 
