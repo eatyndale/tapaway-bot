@@ -16,26 +16,26 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
     >
       {/* Avatar */}
       <div 
-        className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center shadow-soft ${
+        className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center ${
           isUser 
-            ? 'bg-gradient-to-br from-primary to-primary/70' 
-            : 'bg-gradient-to-br from-muted to-muted/70 border border-border/50'
+            ? 'bg-gradient-to-br from-primary to-primary/70 shadow-warm' 
+            : 'bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 shadow-soft'
         }`}
       >
         {isUser ? (
           <User className="w-4 h-4 text-white" />
         ) : (
-          <Bot className="w-4 h-4 text-foreground/70" />
+          <Bot className="w-4 h-4 text-primary" />
         )}
       </div>
       
       {/* Message Bubble */}
       <div className={`flex flex-col gap-1 max-w-[75%] ${isUser ? 'items-end' : 'items-start'}`}>
         <div
-          className={`relative px-4 py-3 rounded-2xl shadow-soft transition-all duration-300 ${
+          className={`relative px-4 py-3 rounded-2xl transition-all duration-300 ${
             isUser
-              ? 'bg-gradient-to-br from-primary to-primary/90 text-white rounded-br-md'
-              : 'bg-card border border-border/50 text-foreground rounded-bl-md glass'
+              ? 'bg-gradient-to-br from-primary to-primary/90 text-white rounded-br-md shadow-warm'
+              : 'bg-secondary/80 border border-border text-foreground rounded-bl-md shadow-soft'
           }`}
         >
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
