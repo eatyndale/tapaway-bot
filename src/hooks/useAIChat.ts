@@ -24,6 +24,7 @@ interface SessionContext {
   isDeepening?: boolean;
   deepeningAttempts?: number;
   totalRoundsWithoutReduction?: number;
+  isDeepeningEntry?: boolean;  // True when entering deepening (system context, not user message)
 }
 
 interface Directive {
@@ -199,7 +200,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       onTypoCorrection(userMessage, processedMessage);
     }
 
-    // Add user message (showing original message to user, but using corrected version for AI)
+    // Check if this is a deepening entry (system context, not a real user message)
+    const isDeepeningEntry = (additionalContext as any)?.isDeepeningEntry === true;
+    
+    // Add user message ONLY if it's not a deepening entry (those are hidden)
     const userMsg: Message = {
       id: `user-${Date.now()}`,
       type: 'user',
@@ -208,8 +212,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       sessionId: currentChatSession
     };
 
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
+    const updatedMessages = isDeepeningEntry ? [...messages] : [...messages, userMsg];
+    if (!isDeepeningEntry) {
+      setMessages(updatedMessages);
+    }
 
     // Update session context with intensity tracking
     const updatedContext = { ...sessionContext, ...additionalContext };
@@ -620,7 +626,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       const deepeningContext = {
         ...updatedContext,
         isDeepening: true,
-        deepeningAttempts: (sessionContext.deepeningAttempts || 0) + 1
+        deepeningAttempts: 0  // Start at 0 - will be incremented on actual user responses
       };
       
       setSessionContext(deepeningContext);
@@ -629,11 +635,12 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       // Transition to dedicated deepening state (not regular conversation)
       onStateChange('conversation-deepening');
       
-      // Send deepening context to AI - this will trigger the AI to ask probing questions
+      // Send ENTRY marker to get AI's first probing question
+      // This is NOT a user message - it's hidden system context
       await sendMessage(
-        `My intensity is still at ${newIntensity}/10 after tapping. I need to explore what's really underneath this.`,
+        `[DEEPENING_ENTRY] Intensity: ${newIntensity}/10. Problem: ${sessionContext.problem}. Feeling: ${sessionContext.feeling}.`,
         'conversation-deepening',
-        deepeningContext
+        { ...deepeningContext, isDeepeningEntry: true }
       );
       
     } else {

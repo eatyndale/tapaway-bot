@@ -1107,42 +1107,101 @@ I'm here whenever you need me. 💚
       }
     } else if (sanitizedChatState === 'conversation-deepening') {
       // ============================================================================
-      // DEEPENING COMPLETION DETECTION
-      // If the user reveals a deeper issue (new feeling or belief), generate setup
-      // statements via tool calling and transition to setup (not gathering-intensity)
-      // MAX 2 QUESTIONS: After 2 user messages in deepening, auto-transition
+      // DEEPENING CONVERSATION - Two modes:
+      // 1. ENTRY: First time entering deepening - ask the first probing question
+      // 2. USER RESPONSE: Actual user input - check if they revealed new context
       // ============================================================================
-      console.log('[eft-chat] conversation-deepening: checking for deeper issue revelation');
+      console.log('[eft-chat] conversation-deepening: processing message');
       
-      // Count how many user messages occurred in deepening state
-      const deepeningAttempts = sessionContext.deepeningAttempts || 0;
-      const newDeepeningAttempts = deepeningAttempts + 1;
-      console.log('[eft-chat] Deepening attempts:', newDeepeningAttempts);
+      // Detect if this is the ENTRY point (auto-triggered, not a real user message)
+      const isDeepeningEntry = sanitizedMessage.includes('[DEEPENING_ENTRY]') || 
+                               sanitizedMessage.includes('My intensity is still at');
       
-      // Use PRE-MERGE values (captured before line 524) to detect NEW information
-      const newFeeling = classification.extracted?.feeling || '';
-      const newProblem = classification.extracted?.problem || '';
-      
-      // Detect if user revealed something new (compare against pre-merge values)
-      const revealedDeeperFeeling = newFeeling && newFeeling.toLowerCase() !== preMergeFeeling.toLowerCase() && newFeeling.length > 0;
-      const revealedDeeperProblem = newProblem && newProblem.toLowerCase() !== preMergeProblem.toLowerCase() && newProblem.length > 0;
-      
-      // Also check if user gave a substantial response (even if extraction didn't catch it)
-      const hasSubstantialResponse = sanitizedMessage.length > 15;
-      
-      // Transition if: new info revealed OR 2+ attempts OR substantial response after 1 attempt
-      const revealedDeeper = revealedDeeperFeeling || revealedDeeperProblem;
-      const shouldTransition = revealedDeeper || newDeepeningAttempts >= 2 || (hasSubstantialResponse && newDeepeningAttempts >= 1);
-      
-      console.log('[eft-chat] Deeper issue check:', {
-        preMergeFeeling, preMergeProblem,
-        newFeeling, newProblem,
-        revealedDeeperFeeling, revealedDeeperProblem,
-        revealedDeeper, hasSubstantialResponse,
-        newDeepeningAttempts, shouldTransition
-      });
-      
-      if (shouldTransition) {
+      if (isDeepeningEntry) {
+        // ========== ENTRY MODE: Ask the first probing question ==========
+        console.log('[eft-chat] Deepening ENTRY - generating first probing question');
+        
+        const entryPrompt = `You are an EFT tapping therapist having a warm, supportive conversation.
+
+The user just finished a tapping round but their intensity didn't reduce much.
+Current context:
+- Problem: "${sessionContext.problem || 'their issue'}"
+- Feeling: "${sessionContext.feeling || 'distress'}"
+- Body location: "${sessionContext.bodyLocation || 'body'}"
+
+Ask ONE warm, open-ended probing question to explore what's underneath this feeling.
+Be curious and gentle. Help them discover what's really going on.
+
+Examples of good probing questions:
+- "What aspect of [problem] feels most heavy right now?"
+- "When you sit with this [feeling], what thoughts come up?"
+- "Is there something specific about [problem] that's weighing on you?"
+- "What does this [feeling] remind you of?"
+
+Do NOT ask for intensity. Do NOT suggest tapping yet. Just be curious.
+
+CRITICAL: End your response with exactly:
+<<DIRECTIVE {"next_state":"conversation-deepening","collect":"conversation"}>>`;
+
+        const entryMessages = [
+          { role: 'system', content: entryPrompt },
+          ...conversationHistory.slice(-10).map((msg: any) => ({
+            role: msg.type === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          }))
+        ];
+        
+        const entryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: entryMessages,
+            temperature: 0.8,
+            max_tokens: 200,
+          }),
+        });
+        
+        const entryData = await entryResponse.json();
+        if (!entryResponse.ok) {
+          throw new Error(entryData.error?.message || 'OpenAI API error (deepening entry)');
+        }
+        
+        aiResponse = entryData.choices[0].message.content;
+        
+        // Ensure directive is present
+        if (!aiResponse.includes('<<DIRECTIVE')) {
+          aiResponse += `\n\n<<DIRECTIVE {"next_state":"conversation-deepening","collect":"conversation"}>>`;
+        }
+        
+        console.log('[eft-chat] ✅ First probing question generated');
+        
+      } else {
+        // ========== USER RESPONSE MODE: Check for new context ==========
+        console.log('[eft-chat] Deepening USER RESPONSE - checking for new context');
+        
+        // Use PRE-MERGE values to detect genuinely NEW information
+        const newFeeling = classification.extracted?.feeling || '';
+        const newProblem = classification.extracted?.problem || '';
+        
+        // Detect if user revealed something new (compare against pre-merge values)
+        const revealedDeeperFeeling = newFeeling && newFeeling.toLowerCase() !== preMergeFeeling.toLowerCase() && newFeeling.length > 0;
+        const revealedDeeperProblem = newProblem && newProblem.toLowerCase() !== preMergeProblem.toLowerCase() && newProblem.length > 0;
+        
+        // Only transition when genuinely NEW information is revealed
+        const shouldTransition = revealedDeeperFeeling || revealedDeeperProblem;
+        
+        console.log('[eft-chat] Deeper issue check:', {
+          preMergeFeeling, preMergeProblem,
+          newFeeling, newProblem,
+          revealedDeeperFeeling, revealedDeeperProblem,
+          shouldTransition
+        });
+        
+        if (shouldTransition) {
         // User revealed a deeper issue - generate setup statements via tool calling
         console.log('[eft-chat] ✅ Deeper issue revealed! Using tool calling for setup statements');
         
@@ -1274,6 +1333,7 @@ DIRECTIVE (MANDATORY - end every response with this):
         if (!aiResponse.includes('<<DIRECTIVE')) {
           console.warn('[eft-chat] AI forgot directive in deepening - appending fallback');
           aiResponse += `\n\n<<DIRECTIVE {"next_state":"conversation-deepening","collect":"conversation"}>>`;
+        }
         }
       }
     } else {
