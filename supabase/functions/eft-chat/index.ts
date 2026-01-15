@@ -940,65 +940,50 @@ sessionContext.problem?.toLowerCase().includes('work') || sessionContext.problem
 - Intensity: ${sessionContext.currentIntensity || sessionContext.initialIntensity || 'N/A'}/10
 
 **YOUR TASK:**
-Use the generate_tapping_directive tool to create 3 grammatically perfect setup statements.
+Use the generate_tapping_directive tool to create 3 setup statements in the SHORT format.
 Your visible response should be short: "Thank you, ${capitalizedName}. Take a deep breath in... and breathe out. Let's begin the setup."
 
 Note: After this, user will go through the SETUP phase (karate chop tapping with these statements) before the main tapping sequence.
 
-**CRITICAL GRAMMAR RULES - READ CAREFULLY:**
+**SETUP STATEMENT FORMAT (SHORT FORMAT for Round 1):**
 
-1. **ADJECTIVES vs NOUNS (most common error!):**
-   - "exhausted", "stressed", "anxious", "overwhelmed" are ADJECTIVES
-   - You MUST convert to NOUNS when using "this ___":
-   - ❌ BAD: "this exhausted", "this stressed", "this anxious", "this overwhelmed"
-   - ✅ GOOD: "this exhaustion", "this stress", "this anxiety", "this overwhelm"
-   
-   | Adjective    | Noun form         |
-   |--------------|-------------------|
-   | exhausted    | exhaustion        |
-   | stressed     | stress            |
-   | anxious      | anxiety           |
-   | overwhelmed  | overwhelm         |
-   | frustrated   | frustration       |
-   | worried      | worry             |
-   | scared/afraid| fear              |
-   | sad          | sadness           |
-   | tired        | tiredness         |
-   | angry        | anger             |
+Each statement follows this pattern:
+"[This + emotion NOUN] in my [body location], [brief problem context], but I want to let it go."
 
-2. **ARTICLES ARE REQUIRED:**
-   - ❌ BAD: "about project", "from work", "about deadline"
-   - ✅ GOOD: "about the project", "from my work", "about this deadline"
+**CRITICAL GRAMMAR RULES:**
 
-3. **COMPLETE NATURAL SENTENCES:**
-   - ❌ BAD: "I have this project and I feel exhausted"
-   - ✅ GOOD: "this project is leaving me exhausted"
-   - ❌ BAD: "I'm experiencing exhausted about project"
-   - ✅ GOOD: "I'm experiencing exhaustion about this project"
+1. **ADJECTIVES vs NOUNS:**
+   - Convert adjectives to nouns: anxious → anxiety, stressed → stress, overwhelmed → overwhelm
+   - ❌ BAD: "This anxious in my chest"
+   - ✅ GOOD: "This anxiety in my chest"
+
+2. **KEEP IT CONCISE:**
+   - The problem context should be brief (3-6 words)
+   - End with a release phrase like "but I want to let it go" or "but I'm okay"
 
 **EXAMPLES OF PERFECT STATEMENTS:**
 
-If feeling "exhausted" about "project" in "body":
-- ✅ "Even though I have this exhaustion in my body from the project, I deeply and completely accept myself"
-- ✅ "Even though this project is leaving me exhausted, I choose to accept myself anyway"
-- ✅ "Even though my body feels heavy and tired from all this, I'm okay"
+If feeling "anxious" about "argument with John" in "chest":
+- ✅ "This anxiety in my chest, I argued with John, but I want to let it go."
+- ✅ "This tension in my chest, the argument with John, but I'm choosing peace."
+- ✅ "This knot in my chest, what happened with John, but I'm okay."
 
-If feeling "stressed" about "work deadlines" in "chest":
-- ✅ "Even though I have this stress in my chest, I deeply and completely accept myself"
-- ✅ "Even though work deadlines are causing all this tension, I choose to accept myself anyway"
-- ✅ "Even though my chest feels tight and heavy, I'm okay"
+If feeling "stressed" about "work deadlines" in "shoulders":
+- ✅ "This stress in my shoulders, the deadlines at work, but I want to let it go."
+- ✅ "This tension in my shoulders, work is overwhelming, but I'm choosing calm."
+- ✅ "This tightness in my shoulders, too much to do, but I'm okay."
 
-If feeling "anxious" about "upcoming presentation" in "stomach":
-- ✅ "Even though I have this anxiety in my stomach about the presentation, I deeply and completely accept myself"
-- ✅ "Even though the upcoming presentation is making me anxious, I choose to accept myself anyway"
-- ✅ "Even though my stomach feels knotted and tense, I'm okay"
+If feeling "overwhelmed" about "project" in "head":
+- ✅ "This overwhelm in my head, the project is too much, but I want to let it go."
+- ✅ "This pressure in my head, everything piling up, but I'm choosing peace."
+- ✅ "This heaviness in my head, so much to handle, but I'm okay."
 
-**SETUP STATEMENT VARIETY (each must be different):**
-- Statement 1: Focus on feeling noun + body location
-- Statement 2: MUST reference the problem/source naturally
-- Statement 3: Focus on physical sensation description
+**STATEMENT VARIETY (each must be different):**
+- Statement 1: Focus on the primary emotion noun + body location
+- Statement 2: Reference the problem/source more directly
+- Statement 3: Focus on physical sensation with different ending
 
-**FINAL CHECK:** Read each statement out loud in your mind. Does it sound like natural English a native speaker would say? If it sounds awkward or robotic, rewrite it.
+**FINAL CHECK:** Each statement should sound natural and follow the short format pattern.
 `;
         break;
       case 'tapping-point':
@@ -1141,7 +1126,7 @@ I'm here whenever you need me. 💚
             setup_statements: {
               type: "array",
               items: { type: "string" },
-              description: "Array of exactly 3 varied EFT setup statements. Each MUST be grammatically correct. Use NOUN forms after 'this' (e.g., 'this anxiety' not 'this anxious').",
+              description: "Array of exactly 3 varied EFT setup statements in the SHORT format: '[Emotion noun] in my [body], [problem context], but I want to let it go.' Example: 'This anxiety in my chest, I argued with John, but I want to let it go.'",
               minItems: 3,
               maxItems: 3
             },
@@ -1285,17 +1270,15 @@ Current problem: "${exitProblem}"
 Current feeling: "${exitFeeling}"
 Body location: "${bodyLocation}"
 
-Generate 3 COMPLETE EFT setup statements. Each statement MUST:
-1. Start with "Even though..."
-2. Use the NOUN form of the emotion (anxious → anxiety, overwhelmed → overwhelm, stressed → stress)
-3. End with a self-acceptance phrase like "I deeply and completely accept myself"
+Generate 3 EFT setup statements in the SHORT format:
+"[This + emotion NOUN] in my [body location], [brief problem context], but I want to let it go."
 
-Example format:
-- "Even though I have this anxiety in my chest, I deeply and completely accept myself"
-- "Even though work is causing me this stress, I choose to accept myself anyway"
-- "Even though my body feels tense and heavy, I'm okay"
+Examples:
+- "This anxiety in my chest, I argued with John, but I want to let it go."
+- "This tension in my shoulders, work is overwhelming, but I'm choosing peace."
+- "This knot in my stomach, everything feels like too much, but I'm okay."
 
-CRITICAL: Each statement must be complete - not just a fragment.`;
+CRITICAL: Keep each statement concise. Use NOUN forms (anxious → anxiety, stressed → stress).`;
       
         const exitToolMessages = [
           { role: 'system', content: exitToolPrompt },
@@ -1544,24 +1527,26 @@ IMPORTANT:
           
           const bodyLocation = sessionContext.bodyLocation || 'body';
           
-          // Generate setup statements
-          const setupToolPrompt = `You are an EFT tapping therapist. Generate setup statements for the deeper issue discovered.
+          // Generate setup statements for subsequent rounds (include STILL/remaining)
+          const setupToolPrompt = `You are an EFT tapping therapist. Generate setup statements for ROUND 2+ (subsequent round after initial tapping).
 
 Deeper problem: "${deeperProblem}"
 Deeper feeling: "${deeperFeeling}"
 Body location: "${bodyLocation}"
 
-Generate 3 COMPLETE EFT setup statements. Each statement MUST:
-1. Start with "Even though..."
-2. Use the NOUN form of the emotion (anxious → anxiety, overwhelmed → overwhelm, stressed → stress, sad → sadness)
-3. End with a self-acceptance phrase like "I deeply and completely accept myself"
+For SUBSEQUENT ROUNDS, use the "STILL" format to acknowledge remaining feeling:
 
-Example format:
-- "Even though I have this anxiety about the deadline, I deeply and completely accept myself"
-- "Even though this overwhelm is weighing on me, I choose to accept myself anyway"
-- "Even though my chest feels tight with this tension, I'm okay"
+Generate 3 varied statements. Mix these patterns:
+1. "Even though I STILL feel some of this [emotion noun] in my [body] because [problem], I'd like to be at peace."
+2. "I STILL feel [emotion adjective] in my [body], I'd like to relax now."
+3. "This remaining [emotion noun] in my [body], [problem context], but I want to let it go."
 
-CRITICAL: Each statement must be complete - not just a fragment like "this anxiety".`;
+Examples:
+- "Even though I STILL feel some of this anxiety in my chest because I had an argument with John, I'd like to be at peace."
+- "I STILL feel anxious in my chest, I'd like to relax now."
+- "This remaining anxiety in my chest, I argued with John, but I want to let it go."
+
+CRITICAL: Include "STILL" or "remaining" to acknowledge the residual feeling. Use NOUN forms where appropriate.`;
         
           const setupToolMessages = [
             { role: 'system', content: setupToolPrompt },
@@ -1640,13 +1625,16 @@ CRITICAL: Each statement must be complete - not just a fragment like "this anxie
             const finalProblem = sessionContext.problem || preMergeProblem;
             const finalFeeling = sessionContext.feeling || preMergeFeeling;
             
-            const fallbackToolPrompt = `You are an EFT tapping therapist. Generate setup statements.
+            const fallbackToolPrompt = `You are an EFT tapping therapist. Generate setup statements for ROUND 2+.
 
 Problem: "${finalProblem}"
 Feeling: "${finalFeeling}"
 Body location: "${bodyLocation}"
 
-Generate 3 EFT setup statements. Use the NOUN form of the emotion.`;
+Generate 3 statements with "STILL" or "remaining" to acknowledge residual feeling:
+- "Even though I STILL feel some of this [emotion] in my [body] because [problem], I'd like to be at peace."
+- "I STILL feel [emotion] in my [body], I'd like to relax now."
+- "This remaining [emotion] in my [body], [problem], but I want to let it go."`;
           
             const fallbackToolMessages = [
               { role: 'system', content: fallbackToolPrompt },
