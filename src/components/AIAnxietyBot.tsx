@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAIChat } from "@/hooks/useAIChat";
 import { ChatState, QuestionnaireSession } from "./anxiety-bot/types";
 import { supabaseService } from "@/services/supabaseService";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { Bot, Sparkles } from "lucide-react";
 import ChatHistory from "./anxiety-bot/ChatHistory";
 import SessionProgress from "./anxiety-bot/SessionProgress";
 import IntensitySlider from "./anxiety-bot/IntensitySlider";
@@ -27,6 +27,9 @@ import SessionComplete from "./anxiety-bot/SessionComplete";
 
 const AIAnxietyBot = () => {
   const { toast } = useToast();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
   const [chatState, setChatState] = useState<ChatState>(() => {
     const hasCompletedAssessment = localStorage.getItem('hasCompletedAssessment');
     return hasCompletedAssessment ? 'conversation' : 'questionnaire';
@@ -71,6 +74,18 @@ const AIAnxietyBot = () => {
       console.log('[AIAnxietyBot] Typo corrected:', original, '->', corrected);
     }
   });
+
+  // Auto-scroll to bottom when messages change
+  const scrollToBottom = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(scrollToBottom, 100);
+    return () => clearTimeout(timeoutId);
+  }, [messages, isLoading]);
 
   useEffect(() => {
     loadChatHistory();
@@ -393,12 +408,36 @@ const AIAnxietyBot = () => {
       <div className="grid lg:grid-cols-4 gap-6">
         {/* Chat Interface */}
         <div className="lg:col-span-3">
-          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle>EFT Tapping Assistant</CardTitle>
+          <Card className="border-0 shadow-elevated bg-gradient-to-b from-card to-card/95 backdrop-blur-sm overflow-hidden">
+            {/* Premium Header */}
+            <CardHeader className="border-b border-border/30 bg-gradient-to-r from-primary/5 to-transparent pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-warm">
+                    <Bot className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      EFT Tapping Assistant
+                      <Sparkles className="w-4 h-4 text-primary/60" />
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">
+                      {sessionContext.problem || 'Ready to help you feel better'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-xs text-muted-foreground">Active</span>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[500px] mb-4">
+            <CardContent className="p-0">
+              {/* Messages container with auto-scroll */}
+              <div 
+                ref={scrollContainerRef}
+                className="h-[500px] overflow-y-auto px-6 py-4"
+              >
                 <div className="space-y-4">
                   {messages.map((message, index) => {
                     // Check if this is a choice message
@@ -425,7 +464,7 @@ const AIAnxietyBot = () => {
                         // Legacy continue-choice (keep for backwards compatibility)
                         if (parsed.type === 'continue-choice') {
                           return (
-                            <div key={message.id} className="space-y-3 p-4 bg-secondary/20 rounded-lg">
+                            <div key={message.id} className="space-y-3 p-4 bg-secondary/50 rounded-2xl border border-border/50 shadow-soft">
                               <p className="text-sm font-medium">
                                 Great progress! You've reduced your intensity from {sessionContext.initialIntensity}/10 to {parsed.intensity}/10.
                               </p>
@@ -495,10 +534,16 @@ const AIAnxietyBot = () => {
                       onViewHistory={() => setShowHistory(true)}
                     />
                   )}
+                  
+                  {/* Scroll anchor */}
+                  <div ref={messagesEndRef} className="h-1" />
                 </div>
-              </ScrollArea>
+              </div>
               
-              {renderInput()}
+              {/* Input area */}
+              <div className="p-4 border-t border-border/30 bg-gradient-to-t from-muted/20 to-transparent">
+                {renderInput()}
+              </div>
             </CardContent>
           </Card>
         </div>
