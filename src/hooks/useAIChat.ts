@@ -299,7 +299,21 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       // Parse directive and strip it from visible content
       const directive = parseDirective(data.response);
       // Strip ALL directive formats from visible text (handles >>, }}, >>> variants)
-      const visibleContent = data.response.replace(DIRECTIVE_STRIP_RE, '').trim();
+      let visibleContent = data.response.replace(DIRECTIVE_STRIP_RE, '').trim();
+      
+      // DEFENSIVE: Strip leaked setup statements from visible content if transitioning to setup
+      if (directive?.next_state === 'setup' && directive.setup_statements) {
+        // Remove numbered lists of "Even though..." statements
+        visibleContent = visibleContent
+          .replace(/\d+\.\s*"?Even though[^"]*"?\.?\s*/gi, '')
+          .replace(/\d+\.\s*Even though[^.]*\.\s*/gi, '')
+          .replace(/Even though[^.]*deeply and completely accept myself[^.]*\.?\s*/gi, '')
+          .replace(/Shall we start tapping on these\??/gi, '')
+          .replace(/Here are some new setup statements[^:]*:\s*/gi, '')
+          .replace(/Let's tap on this new layer[^.]*\.\s*/gi, "Let's tap on this new layer.")
+          .trim();
+        console.log('[useAIChat] Stripped leaked setup statements from visible content');
+      }
 
       console.log('[useAIChat] AI Response received. Has directive:', !!directive);
       console.log('[useAIChat] Current state:', chatState);
