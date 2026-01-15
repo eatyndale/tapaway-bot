@@ -103,6 +103,6 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Noto Sans SC', sans-serif;
+    font-family: 'Inter', sans-serif;
   }
 }
