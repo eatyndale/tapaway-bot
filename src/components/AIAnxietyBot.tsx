@@ -293,6 +293,7 @@ const AIAnxietyBot = () => {
           <TappingGuide
             setupStatements={sessionContext.setupStatements}
             statementOrder={sessionContext.statementOrder || [0, 1, 2, 0, 1, 2, 0, 1]}
+            aiReminderPhrases={(sessionContext as any).aiReminderPhrases}
             reminderPhraseType={sessionContext.reminderPhraseType || 'acknowledging'}
             feeling={sessionContext.feeling || 'this feeling'}
             bodyLocation={sessionContext.bodyLocation || 'body'}
