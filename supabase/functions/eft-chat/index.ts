@@ -1133,7 +1133,7 @@ I'm here whenever you need me. 💚
             reminder_phrases: {
               type: "array",
               items: { type: "string" },
-              description: "Array of 8 natural reminder phrases for tapping points. Vary style: first 3 acknowledging (e.g., 'This anxiety', 'I'm feeling this tension'), middle 3 partial-release (e.g., 'Letting this go', 'This feeling is shifting'), last 2 full-release (e.g., 'Releasing this now', 'I'm letting go'). Each phrase should be 3-8 words, grammatically correct.",
+              description: "Array of 8 reminder phrases for tapping points in the format: '[emotion] in my [body], [problem context], but I want to let it go.' Vary the endings: first 3 acknowledging ('but I want to let it go'), middle 3 partial-release ('but I'm choosing peace', 'and I'm okay'), last 2 full-release ('I'm releasing this now', 'I'm letting go'). Examples: 'This anxiety in my chest, I argued with John, but I want to let it go.', 'This tension in my shoulders, work is too much, but I'm choosing calm.', 'This stress in my body, everything piling up, I'm releasing this now.'",
               minItems: 8,
               maxItems: 8
             },
