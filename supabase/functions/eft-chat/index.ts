@@ -1138,10 +1138,10 @@ I'm here whenever you need me. 💚
       );
       
       // Detect if this is the ENTRY point (auto-triggered, not a real user message)
-      // CRITICAL: Use case-insensitive check since sanitizeInput may lowercase the message
+      // CRITICAL: Only rely on marker text - DO NOT trust sessionContext.isDeepeningEntry
+      // The sessionContext flag can become "sticky" if not properly cleared by frontend
       const msgLower = sanitizedMessage.toLowerCase();
-      const isDeepeningEntry = sessionContext.isDeepeningEntry === true || 
-                               msgLower.includes('[deepening_entry]') ||
+      const isDeepeningEntry = msgLower.includes('[deepening_entry]') ||
                                msgLower.includes('deepening_entry');
       
       // Track question count

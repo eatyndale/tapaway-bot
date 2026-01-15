@@ -290,9 +290,6 @@ const AIAnxietyBot = () => {
       
       return (
         <div className="space-y-2">
-          <div className="text-xs text-muted-foreground">
-            State: <span className="font-mono">{chatState}</span> | Point: {currentTappingPoint}/7
-          </div>
           <TappingGuide
             setupStatements={sessionContext.setupStatements}
             statementOrder={sessionContext.statementOrder || [0, 1, 2, 0, 1, 2, 0, 1]}
