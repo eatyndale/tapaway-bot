@@ -1285,7 +1285,17 @@ Current problem: "${exitProblem}"
 Current feeling: "${exitFeeling}"
 Body location: "${bodyLocation}"
 
-Generate 3 EFT setup statements. Use the NOUN form of the emotion.`;
+Generate 3 COMPLETE EFT setup statements. Each statement MUST:
+1. Start with "Even though..."
+2. Use the NOUN form of the emotion (anxious → anxiety, overwhelmed → overwhelm, stressed → stress)
+3. End with a self-acceptance phrase like "I deeply and completely accept myself"
+
+Example format:
+- "Even though I have this anxiety in my chest, I deeply and completely accept myself"
+- "Even though work is causing me this stress, I choose to accept myself anyway"
+- "Even though my body feels tense and heavy, I'm okay"
+
+CRITICAL: Each statement must be complete - not just a fragment.`;
       
         const exitToolMessages = [
           { role: 'system', content: exitToolPrompt },
@@ -1541,8 +1551,17 @@ Deeper problem: "${deeperProblem}"
 Deeper feeling: "${deeperFeeling}"
 Body location: "${bodyLocation}"
 
-Generate 3 EFT setup statements. Use the NOUN form of the emotion.
-Examples: anxious → anxiety, sad → sadness, stressed → stress, "not enough" → "feeling of not being enough"`;
+Generate 3 COMPLETE EFT setup statements. Each statement MUST:
+1. Start with "Even though..."
+2. Use the NOUN form of the emotion (anxious → anxiety, overwhelmed → overwhelm, stressed → stress, sad → sadness)
+3. End with a self-acceptance phrase like "I deeply and completely accept myself"
+
+Example format:
+- "Even though I have this anxiety about the deadline, I deeply and completely accept myself"
+- "Even though this overwhelm is weighing on me, I choose to accept myself anyway"
+- "Even though my chest feels tight with this tension, I'm okay"
+
+CRITICAL: Each statement must be complete - not just a fragment like "this anxiety".`;
         
           const setupToolMessages = [
             { role: 'system', content: setupToolPrompt },
