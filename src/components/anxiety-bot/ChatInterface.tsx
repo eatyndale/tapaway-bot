@@ -53,21 +53,22 @@ const ChatInterface = ({
 
   // Robust auto-scroll that works with dynamic content
   const scrollToBottom = useCallback(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, []);
 
   // Scroll on new messages
   useEffect(() => {
     // Small delay to ensure DOM has updated
-    const timeoutId = setTimeout(scrollToBottom, 50);
+    const timeoutId = setTimeout(scrollToBottom, 100);
     return () => clearTimeout(timeoutId);
-  }, [messages, isLoading, scrollToBottom]);
+  }, [messages, scrollToBottom]);
 
   // Also scroll when loading state changes (bot starts/stops typing)
   useEffect(() => {
-    scrollToBottom();
+    const timeoutId = setTimeout(scrollToBottom, 100);
+    return () => clearTimeout(timeoutId);
   }, [isLoading, scrollToBottom]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
