@@ -202,7 +202,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     }
 
     // Check if this is a deepening entry (system context, not a real user message)
-    const isDeepeningEntry = (additionalContext as any)?.isDeepeningEntry === true;
+    const isDeepeningEntryRequest = (additionalContext as any)?.isDeepeningEntry === true;
     
     // Add user message ONLY if it's not a deepening entry (those are hidden)
     const userMsg: Message = {
@@ -213,21 +213,26 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       sessionId: currentChatSession
     };
 
-    const updatedMessages = isDeepeningEntry ? [...messages] : [...messages, userMsg];
-    if (!isDeepeningEntry) {
+    const updatedMessages = isDeepeningEntryRequest ? [...messages] : [...messages, userMsg];
+    if (!isDeepeningEntryRequest) {
       setMessages(updatedMessages);
     }
 
-    // Update session context with intensity tracking
-    const updatedContext = { ...sessionContext, ...additionalContext };
+    // CRITICAL: Build request context (for API call) vs persisted context (for state)
+    // isDeepeningEntry should NOT be persisted - it's a one-shot flag for this single request
+    const requestContext = { ...sessionContext, ...additionalContext };
+    
+    // Remove isDeepeningEntry from what we persist to avoid sticky flag
+    const persistedContext = { ...requestContext };
+    delete persistedContext.isDeepeningEntry;
 
     // NEW: Intercept post-tapping or tapping-breathing intensity submission
     if ((chatState === 'post-tapping' || chatState === 'tapping-breathing') && additionalContext?.currentIntensity !== undefined) {
       console.log('[useAIChat] Post-tapping/breathing intensity detected - frontend will handle decision');
       
       // Update session context
-      setSessionContext(updatedContext);
-      onSessionUpdate(updatedContext);
+      setSessionContext(persistedContext);
+      onSessionUpdate(persistedContext);
       
       // Track intensity
       const newHistory = [...intensityHistory, additionalContext.currentIntensity];
@@ -259,27 +264,27 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     // Create tapping session when initial intensity is collected
     if (chatState === 'gathering-intensity' && additionalContext?.initialIntensity) {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user && updatedContext.problem && updatedContext.feeling && updatedContext.bodyLocation) {
+      if (user && persistedContext.problem && persistedContext.feeling && persistedContext.bodyLocation) {
         // Get user profile for industry and age_group
         const { profile } = await supabaseService.getProfile(user.id);
         
         const { session: tappingSession } = await supabaseService.createTappingSession(user.id, {
-          problem: updatedContext.problem,
-          feeling: updatedContext.feeling,
-          body_location: updatedContext.bodyLocation,
+          problem: persistedContext.problem,
+          feeling: persistedContext.feeling,
+          body_location: persistedContext.bodyLocation,
           initial_intensity: additionalContext.initialIntensity,
           industry: profile?.industry || null,
           age_group: profile?.age_group || null
         });
         if (tappingSession) {
-          updatedContext.tappingSessionId = tappingSession.id;
-          updatedContext.round = 1;
+          persistedContext.tappingSessionId = tappingSession.id;
+          persistedContext.round = 1;
         }
       }
     }
     
-    setSessionContext(updatedContext);
-    onSessionUpdate(updatedContext);
+    setSessionContext(persistedContext);
+    onSessionUpdate(persistedContext);
 
     try {
       // Get last assistant message for context
@@ -288,12 +293,13 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         .slice(-1)[0]?.content || '';
       
       // Call AI function with enhanced context
+      // IMPORTANT: Use requestContext (includes isDeepeningEntry) for the API call
       const { data, error } = await supabase.functions.invoke('eft-chat', {
         body: {
           message: processedMessage, // Use corrected message for AI processing
           chatState,
           userName: userProfile.first_name,
-          sessionContext: updatedContext,
+          sessionContext: requestContext, // Use requestContext which includes isDeepeningEntry
           conversationHistory: conversationHistory.slice(-20), // Increased context window
           currentTappingPoint,
           intensityHistory,
@@ -307,6 +313,13 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       const directive = parseDirective(data.response);
       // Strip ALL directive formats from visible text (handles >>, }}, >>> variants)
       let visibleContent = data.response.replace(DIRECTIVE_STRIP_RE, '').trim();
+      
+      // SAFEGUARD: If visibleContent is empty after stripping, provide a fallback
+      // This prevents "blank bot message" situations that require double submission
+      if (!visibleContent || visibleContent.length === 0) {
+        console.warn('[useAIChat] Empty visible content after stripping directive - using fallback');
+        visibleContent = "I'm here with you. Can you tell me a bit more about what you're experiencing?";
+      }
       
       // DEFENSIVE: Strip leaked setup statements from visible content if transitioning to setup
       if (directive?.next_state === 'setup' && directive.setup_statements) {
@@ -327,18 +340,18 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
 
       // Use cleaned extracted values from edge function
       if (data.extractedContext) {
-        if (data.extractedContext.problem) updatedContext.problem = data.extractedContext.problem;
-        if (data.extractedContext.feeling) updatedContext.feeling = data.extractedContext.feeling;
-        if (data.extractedContext.bodyLocation) updatedContext.bodyLocation = data.extractedContext.bodyLocation;
+        if (data.extractedContext.problem) persistedContext.problem = data.extractedContext.problem;
+        if (data.extractedContext.feeling) persistedContext.feeling = data.extractedContext.feeling;
+        if (data.extractedContext.bodyLocation) persistedContext.bodyLocation = data.extractedContext.bodyLocation;
         if (data.extractedContext.currentIntensity !== undefined) {
-          updatedContext.currentIntensity = data.extractedContext.currentIntensity;
+          persistedContext.currentIntensity = data.extractedContext.currentIntensity;
         }
         // Persist deepeningQuestionCount from server
         if (data.extractedContext.deepeningQuestionCount !== undefined) {
-          updatedContext.deepeningQuestionCount = data.extractedContext.deepeningQuestionCount;
+          persistedContext.deepeningQuestionCount = data.extractedContext.deepeningQuestionCount;
         }
-        setSessionContext(updatedContext);
-        onSessionUpdate(updatedContext);
+        setSessionContext(persistedContext);
+        onSessionUpdate(persistedContext);
       }
 
       // Add AI response with stripped content
@@ -362,14 +375,14 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         
         // Start-of-round: store statements + order (for both 'setup' and 'tapping-point' transitions)
         if ((next === 'setup' || next === 'tapping-point') && directive.setup_statements) {
-          const setupStatements = directive.setup_statements ?? updatedContext.setupStatements ?? [];
-          const statementOrder = directive.statement_order ?? updatedContext.statementOrder ?? [0, 1, 2, 0, 1, 2, 1, 0];
+          const setupStatements = directive.setup_statements ?? persistedContext.setupStatements ?? [];
+          const statementOrder = directive.statement_order ?? persistedContext.statementOrder ?? [0, 1, 2, 0, 1, 2, 1, 0];
           console.log('[useAIChat] Storing setup statements:', setupStatements);
           console.log('[useAIChat] Storing statement order:', statementOrder);
-          updatedContext.setupStatements = setupStatements;
-          updatedContext.statementOrder = statementOrder;
-          setSessionContext(updatedContext);
-          onSessionUpdate(updatedContext);
+          persistedContext.setupStatements = setupStatements;
+          persistedContext.statementOrder = statementOrder;
+          setSessionContext(persistedContext);
+          onSessionUpdate(persistedContext);
           
           // Reset tapping point for new round
           if (next === 'setup') {
@@ -417,9 +430,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           const setupStatements = extractSetupStatements(visibleContent);
           if (setupStatements.length > 0) {
             console.log('[useAIChat] Extracted setup statements (fallback):', setupStatements);
-            updatedContext.setupStatements = setupStatements;
-            setSessionContext(updatedContext);
-            onSessionUpdate(updatedContext);
+            persistedContext.setupStatements = setupStatements;
+            setSessionContext(persistedContext);
+            onSessionUpdate(persistedContext);
           }
         }
 
@@ -434,10 +447,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       // Update chat session in database
       // Generate session name based on emotions if we have session context
       let sessionName;
-      if (updatedContext.feeling || updatedContext.problem) {
+      if (persistedContext.feeling || persistedContext.problem) {
         sessionName = supabaseService.generateSessionName(
-          updatedContext.feeling || 'anxiety', 
-          updatedContext.problem
+          persistedContext.feeling || 'anxiety', 
+          persistedContext.problem
         );
       }
       
