@@ -632,7 +632,60 @@ CURRENT STAGE GUIDANCE:`;
           hasLocation: !!sessionContext.bodyLocation
         };
         
-        systemPrompt += `
+        // Check if this is a deepening conversation
+        const isDeepening = sessionContext.isDeepening === true;
+        const deepeningAttempt = sessionContext.deepeningAttempts || 0;
+        
+        if (isDeepening) {
+          // DEEPENING CONVERSATION MODE
+          systemPrompt += `
+**CURRENT STATE: conversation (DEEPENING MODE)**
+
+The user has completed tapping but intensity hasn't reduced below 5. We need to explore deeper layers.
+This is deepening attempt #${deepeningAttempt}.
+
+**Previous Context:**
+- Problem: "${sessionContext.problem}"
+- Feeling: "${sessionContext.feeling}"
+- Body location: "${sessionContext.bodyLocation}"
+- Current intensity: ${sessionContext.currentIntensity}/10
+- Rounds completed: ${sessionContext.round || 1}
+
+**Your Task:**
+1. Gently acknowledge that we're going deeper - the surface issue might not be the real issue
+2. Ask specific, probing questions about the initial problem
+3. Look for underlying beliefs, specific triggers, or deeper emotions
+
+**Example Probing Questions (adapt based on their problem):**
+${sessionContext.problem?.toLowerCase().includes('boyfriend') || sessionContext.problem?.toLowerCase().includes('relationship') ? 
+`- "What specific things does he do or say that make you feel this way?"
+- "When you think about this, what's the worst part for you?"
+- "What does this situation mean about you or your worth?"` :
+sessionContext.problem?.toLowerCase().includes('work') || sessionContext.problem?.toLowerCase().includes('job') ?
+`- "What aspect of work feels most overwhelming? Is it the workload, relationships with colleagues, or something else?"
+- "When did you first start feeling this way about work?"
+- "What would happen if you couldn't meet these expectations?"` :
+`- "What's the worst part of this situation for you?"
+- "When you think about this, what specific moment or thought hurts the most?"
+- "What does this situation mean about you or your life?"`}
+
+**Goal:** Extract a deeper/more specific problem and emotion. The body location might stay the same or change.
+
+**Transition:** Once you identify the deeper issue (new problem + emotion), acknowledge it warmly and transition:
+"I can see this runs deeper - this [new emotion as NOUN] about [deeper issue], still sitting in your [body location or new location]. Let's tap on this new layer."
+
+Then include: <<DIRECTIVE {"next_state":"setup","collect":"none"}>>
+
+Note: We skip gathering-intensity because we already have it from the previous round.
+
+**CRITICAL:** 
+- Don't re-ask for intensity - we already have it
+- Generate new setup statements based on the DEEPER issue
+- Be warm and validating - they've done good work exploring this
+`;
+        } else {
+          // Standard conversation mode
+          systemPrompt += `
 **CURRENT STATE: conversation**
 
 You are ${capitalizedName}'s personal EFT tapping therapist — exceptionally warm, human, casual, and a little playful when it fits. You swear when they swear. You laugh when they laugh. You never sound robotic or repetitive.
@@ -694,6 +747,7 @@ ${gatheredInfo.hasProblem && gatheredInfo.hasFeeling && gatheredInfo.hasLocation
   : `<<DIRECTIVE {"next_state":"conversation","collect":"conversation"}>>`
 }
 `;
+        }
         break;
       case 'gathering-intensity':
         systemPrompt += `
@@ -808,6 +862,9 @@ Note: The frontend will decide whether to continue tapping, offer a choice, or m
         const improvementPercentage = initialIntensity 
           ? Math.round((improvement / initialIntensity) * 100) 
           : 0;
+        const deepeningAttempts = sessionContext.deepeningAttempts || 0;
+        const totalRoundsWithoutReduction = sessionContext.totalRoundsWithoutReduction || 0;
+        const reachedStrikeLimit = totalRoundsWithoutReduction >= 3;
         
         systemPrompt += `
 **CURRENT STATE: advice**
@@ -822,6 +879,23 @@ The user has completed their tapping session. Generate personalized advice based
 - Final intensity: ${finalIntensity}/10
 - Improvement: ${improvement} points (${improvementPercentage}%)
 - Rounds completed: ${sessionContext.round || 1}
+- Deepening conversations: ${deepeningAttempts}
+- Reached 3-strike limit: ${reachedStrikeLimit ? 'Yes' : 'No'}
+
+${reachedStrikeLimit ? `
+**SPECIAL CONTEXT: 3-Strike Limit Reached**
+The user went through ${totalRoundsWithoutReduction} rounds without significant reduction (intensity stayed >= 5). 
+${deepeningAttempts > 0 ? `They also tried ${deepeningAttempts} deepening conversation(s) to explore underlying issues.` : ''}
+
+Your advice should:
+- Validate their experience without judgment - this doesn't mean failure
+- Acknowledge that some emotions are deeply rooted and need more time or support
+- Suggest that coming back later when they feel ready can be helpful
+- Recommend trying EFT with a certified practitioner for deeper issues
+- Provide alternative coping strategies (breathing exercises, journaling, movement, grounding techniques)
+- If this is a recurring pattern, gently encourage seeking professional therapeutic support
+- Be warm and supportive - they've done important work even if the number didn't drop
+` : ''}
 
 **Advice Generation Guidelines:**
 

@@ -29,6 +29,9 @@ export interface ChatSession {
   previousIntensities?: number[];
   reminderPhraseType?: ReminderPhraseType;
   deepeningLevel?: number;
+  isDeepening?: boolean;
+  deepeningAttempts?: number;
+  totalRoundsWithoutReduction?: number;
 }
 
 export interface Message {

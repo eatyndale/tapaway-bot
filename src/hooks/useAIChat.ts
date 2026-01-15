@@ -21,6 +21,9 @@ interface SessionContext {
   reminderPhraseType?: 'acknowledging' | 'partial-release' | 'full-release';
   deepeningLevel?: number;
   returningFromTapping?: boolean;
+  isDeepening?: boolean;
+  deepeningAttempts?: number;
+  totalRoundsWithoutReduction?: number;
 }
 
 interface Directive {
@@ -464,14 +467,18 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     // Increment round number
     const newRound = (sessionContext.round || 1) + 1;
     
-    // Update session context with phrase type
+    // Update session context with phrase type and preserve deepening tracking
     const updatedContext = {
       ...sessionContext,
       currentIntensity: currentIntensity,
       round: newRound,
       setupStatements: newSetupStatements,
       statementOrder: statementOrder,
-      reminderPhraseType: determinedPhraseType
+      reminderPhraseType: determinedPhraseType,
+      // Preserve deepening tracking
+      totalRoundsWithoutReduction: sessionContext.totalRoundsWithoutReduction || 0,
+      deepeningAttempts: sessionContext.deepeningAttempts || 0,
+      isDeepening: false // Reset deepening flag for new round
     };
     
     setSessionContext(updatedContext);
@@ -532,6 +539,11 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       ? (sessionContext.roundsWithoutReduction || 0) + 1 
       : 0;
     
+    // Track total rounds without meaningful reduction (intensity still >= 5)
+    const totalRoundsWithoutReduction = newIntensity >= 5 
+      ? (sessionContext.totalRoundsWithoutReduction || 0) + 1
+      : 0;
+    
     // Determine reminder phrase type for next round
     let phraseType: 'acknowledging' | 'partial-release' | 'full-release';
     if (newIntensity > 3) {
@@ -547,6 +559,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       ...sessionContext,
       currentIntensity: newIntensity,
       roundsWithoutReduction,
+      totalRoundsWithoutReduction,
       reminderPhraseType: phraseType,
       previousIntensities: [...(sessionContext.previousIntensities || []), newIntensity]
     };
@@ -567,8 +580,56 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         { currentIntensity: 0 }
       );
       
+    } else if (totalRoundsWithoutReduction >= 3) {
+      // 3-STRIKE LIMIT: After 3 rounds without reducing below 5, go to advice
+      console.log('[useAIChat] 3-strike limit reached - transitioning to advice');
+      
+      await completeTappingSession(newIntensity);
+      onStateChange('advice');
+      
+      await sendMessage(
+        `After ${sessionContext.round || 3} rounds, my intensity is at ${newIntensity}/10. Initial was ${initialIntensity}/10. We've tried deepening ${sessionContext.deepeningAttempts || 0} times.`,
+        'advice',
+        { currentIntensity: newIntensity, totalRoundsWithoutReduction }
+      );
+      
+    } else if (newIntensity >= 5 && totalRoundsWithoutReduction >= 1) {
+      // AUTO-DEEPENING: Intensity still >= 5 after a round, trigger deepening conversation
+      console.log('[useAIChat] Intensity still >= 5, triggering conversation deepening');
+      
+      const deepeningContext = {
+        ...updatedContext,
+        isDeepening: true,
+        deepeningAttempts: (sessionContext.deepeningAttempts || 0) + 1
+      };
+      
+      setSessionContext(deepeningContext);
+      onSessionUpdate(deepeningContext);
+      
+      // Add transition message
+      const transitionMessage: Message = {
+        id: `deepening-${Date.now()}`,
+        type: 'bot',
+        content: `I notice your intensity is still at ${newIntensity}/10. Sometimes there's more beneath the surface. Let's explore a bit deeper...`,
+        timestamp: new Date(),
+        sessionId: currentChatSession
+      };
+      
+      setMessages(prev => [...prev, transitionMessage]);
+      setConversationHistory(prev => [...prev, transitionMessage]);
+      
+      // Transition to conversation for deepening
+      onStateChange('conversation');
+      
+      // Send deepening context to AI
+      await sendMessage(
+        `My intensity is still at ${newIntensity}/10 after tapping. I need to explore deeper.`,
+        'conversation',
+        deepeningContext
+      );
+      
     } else {
-      // Show post-tapping choice UI (handles all cases: low intensity, high intensity, no reduction)
+      // Show post-tapping choice UI (handles all cases: low intensity, good progress)
       console.log('[useAIChat] Showing post-tapping choice UI');
       
       const choiceMessage: Message = {

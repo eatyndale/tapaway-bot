@@ -10,10 +10,12 @@ interface SetupPhaseProps {
   onComplete: () => void;
 }
 
+const SECONDS_PER_STATEMENT = 15; // 15 seconds per statement as per spec
+
 const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
   const [currentStatement, setCurrentStatement] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(10);
+  const [timeRemaining, setTimeRemaining] = useState(SECONDS_PER_STATEMENT);
   const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -46,7 +48,7 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
   const handleNext = () => {
     if (currentStatement < setupStatements.length - 1) {
       setCurrentStatement(prev => prev + 1);
-      setTimeRemaining(10);
+      setTimeRemaining(SECONDS_PER_STATEMENT);
     } else {
       // All statements completed
       setIsPlaying(false);
@@ -74,7 +76,7 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
     }
   };
 
-  const progress = ((currentStatement + (10 - timeRemaining) / 10) / setupStatements.length) * 100;
+  const progress = ((currentStatement + (SECONDS_PER_STATEMENT - timeRemaining) / SECONDS_PER_STATEMENT) / setupStatements.length) * 100;
   const currentStatementText = setupStatements[currentStatement] || "Even though I have this feeling, I deeply and completely accept myself";
 
   return (
@@ -105,9 +107,9 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
           <Progress value={progress} className="h-2" />
         </div>
 
-        {/* Karate Chop Image */}
+        {/* Karate Chop Image with pulse animation when playing */}
         <div className="relative bg-gradient-to-b from-primary/5 to-secondary/5 rounded-lg p-6 flex items-center justify-center">
-          <div className="relative w-full max-w-sm">
+          <div className={`relative w-full max-w-sm transition-transform duration-300 ${isPlaying ? 'animate-pulse' : ''}`}>
             <img 
               src={karateChopImg} 
               alt="Karate chop tapping point"
@@ -123,20 +125,20 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
           </div>
         </div>
 
-        {/* Current Statement */}
+        {/* Current Statement with fade transition */}
         <div className="text-center space-y-4">
-          <div className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20">
+          <div className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20 transition-all duration-300">
             <p className="text-sm font-medium text-muted-foreground mb-2">
               Repeat while tapping:
             </p>
-            <p className="text-lg font-semibold text-foreground leading-relaxed">
+            <p className="text-lg font-semibold text-foreground leading-relaxed animate-fade-in">
               "{currentStatementText}"
             </p>
           </div>
 
           {/* Timer */}
           {isPlaying && (
-            <div className="flex items-center justify-center space-x-2">
+            <div className="flex items-center justify-center space-x-2 animate-fade-in">
               <div className="w-14 h-14 rounded-full border-4 border-primary/30 bg-primary/10 flex items-center justify-center">
                 <span className="text-2xl font-bold text-primary">{timeRemaining}</span>
               </div>
