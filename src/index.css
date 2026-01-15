@@ -279,4 +279,21 @@
   .card-warm:hover {
     box-shadow: var(--shadow-warm);
   }
+
+  /* Ultra-slow setup image breathe (for SetupPhase) */
+  @keyframes setup-breathe {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.007);
+      opacity: 0.985;
+    }
+  }
+
+  .setup-breathe-slow {
+    animation: setup-breathe 180s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
 }
