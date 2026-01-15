@@ -19,11 +19,10 @@ export default {
 			}
 		},
 		extend: {
-			fontFamily: {
-				'sans': ['Inter', 'sans-serif'],
-				'serif': ['Lora', 'serif'],
-				'heading': ['Lora', 'serif'],
-			},
+		fontFamily: {
+			'sans': ['Inter', 'sans-serif'],
+			'heading': ['Inter', 'sans-serif'],
+		},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -133,16 +132,16 @@ export default {
 						transform: 'scale(1)'
 					}
 				},
-				'breathe': {
-					'0%, 100%': {
-						opacity: '1',
-						transform: 'scale(1)'
-					},
-					'50%': {
-						opacity: '0.85',
-						transform: 'scale(1.02)'
-					}
+			'breathe': {
+				'0%, 100%': {
+					opacity: '1',
+					transform: 'scale(1)'
 				},
+				'50%': {
+					opacity: '0.92',
+					transform: 'scale(1.015)'
+				}
+			},
 				'pulse-soft': {
 					'0%, 100%': {
 						opacity: '1'
@@ -174,7 +173,7 @@ export default {
 				'fade-in': 'fade-in 0.6s ease-out',
 				'fade-in-up': 'fade-in-up 0.5s ease-out',
 				'fade-in-scale': 'fade-in-scale 0.4s ease-out',
-				'breathe': 'breathe 4s ease-in-out infinite',
+				'breathe': 'breathe 16s ease-in-out infinite',
 				'pulse-soft': 'pulse-soft 3s ease-in-out infinite',
 				'float': 'float 4s ease-in-out infinite',
 				'glow-pulse': 'glow-pulse 3s ease-in-out infinite'
