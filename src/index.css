@@ -287,13 +287,13 @@
       opacity: 1;
     }
     50% {
-      transform: scale(1.007);
-      opacity: 0.985;
+      transform: scale(1.015);
+      opacity: 0.97;
     }
   }
 
   .setup-breathe-slow {
-    animation: setup-breathe 180s ease-in-out infinite;
+    animation: setup-breathe 40s ease-in-out infinite;
     will-change: transform, opacity;
   }
 }
