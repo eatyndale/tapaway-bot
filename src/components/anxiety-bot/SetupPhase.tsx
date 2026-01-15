@@ -120,7 +120,7 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
 
         {/* Karate Chop Image with pulse animation when playing */}
         <div className="relative bg-gradient-to-b from-primary/5 to-secondary/5 rounded-lg p-6 flex items-center justify-center">
-          <div className={`relative w-full max-w-sm transition-transform duration-300 ${isPlaying ? 'animate-pulse' : ''}`}>
+          <div className={`relative w-full max-w-sm transition-transform duration-300 ${isPlaying ? 'animate-breathe' : ''}`}>
             <img 
               src={setupMeditationImg} 
               alt="Meditation setup pose"
