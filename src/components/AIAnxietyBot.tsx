@@ -343,6 +343,20 @@ const AIAnxietyBot = () => {
       return null;
     }
 
+    // Conversation-deepening uses same UI as conversation
+    if (chatState === 'conversation' || chatState === 'conversation-deepening') {
+      return (
+        <ChatInput
+          chatState={chatState}
+          currentInput={currentInput}
+          onInputChange={setCurrentInput}
+          onSubmit={handleSubmit}
+          onKeyPress={handleKeyPress}
+          isLoading={isLoading}
+        />
+      );
+    }
+
     return (
       <ChatInput
         chatState={chatState}

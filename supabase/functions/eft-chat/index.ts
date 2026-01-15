@@ -749,6 +749,69 @@ ${gatheredInfo.hasProblem && gatheredInfo.hasFeeling && gatheredInfo.hasLocation
 `;
         }
         break;
+      
+      case 'conversation-deepening':
+        // DEDICATED DEEPENING STATE - separate from regular conversation
+        // This avoids conflicts with "auto-advance" logic
+        const deepeningAttemptNum = sessionContext.deepeningAttempts || 1;
+        
+        systemPrompt += `
+**CURRENT STATE: conversation-deepening**
+
+The user has completed tapping but intensity hasn't reduced below 5. This is deepening attempt #${deepeningAttemptNum}. We need to explore deeper layers to find what's really underneath.
+
+**IMPORTANT: We already have their intensity. Do NOT ask for it again.**
+
+**Previous Context:**
+- Problem: "${sessionContext.problem}"
+- Feeling: "${sessionContext.feeling}"
+- Body location: "${sessionContext.bodyLocation}"
+- Current intensity: ${sessionContext.currentIntensity}/10
+- Rounds completed: ${sessionContext.round || 1}
+
+**Your Task:**
+1. Warmly acknowledge that the intensity is still there — this often means there's something deeper
+2. Ask ONE specific, probing question to find the root cause
+3. Look for underlying beliefs, specific triggers, memories, or deeper emotions
+
+**Example Probing Questions (adapt based on their problem):**
+${sessionContext.problem?.toLowerCase().includes('boyfriend') || sessionContext.problem?.toLowerCase().includes('relationship') || sessionContext.problem?.toLowerCase().includes('partner') ? 
+`- "What specific thing did he do or say that hurt the most?"
+- "When you think about this, what's the worst part for you?"
+- "What does this situation make you believe about yourself?"
+- "Has anything like this happened before in your life?"` :
+sessionContext.problem?.toLowerCase().includes('work') || sessionContext.problem?.toLowerCase().includes('job') || sessionContext.problem?.toLowerCase().includes('boss') ?
+`- "What aspect of work feels most overwhelming — the workload, relationships, expectations?"
+- "When did you first start feeling this way about work?"
+- "What are you afraid will happen if things don't change?"
+- "What does this situation make you believe about your worth?"` :
+`- "What's the hardest part of this situation for you?"
+- "When you think about this, what specific moment or thought hurts the most?"
+- "What does this situation make you believe about yourself or your life?"
+- "Has something like this happened before?"
+- "If you could change one thing about this situation, what would it be?"`}
+
+**Transition Rules:**
+- Keep asking probing questions until you identify a DEEPER or MORE SPECIFIC issue
+- Once you find the deeper issue (new problem + emotion), acknowledge it warmly and generate new setup statements
+
+**When the user reveals something deeper, respond like this:**
+"I see — it's not just [surface issue], it's really about [deeper issue]. That [new emotion as NOUN] makes so much sense. Let's tap on this new layer."
+
+Then transition to setup with NEW setup statements based on the deeper issue:
+<<DIRECTIVE {"next_state":"setup","setup_statements":["Even though I have this [new emotion noun] about [deeper issue], I deeply and completely accept myself","Even though [deeper issue] is affecting me this way, I choose to accept myself anyway","Even though my [body location] is holding this [new emotion noun], I'm okay"],"statement_order":[0,1,2,0,1,2,1,0],"tapping_point":0,"collect":"none"}>>
+
+**If still exploring, stay in this state:**
+<<DIRECTIVE {"next_state":"conversation-deepening","collect":"conversation"}>>
+
+**CRITICAL:** 
+- Do NOT ask for intensity — we already have it
+- Do NOT transition to gathering-intensity
+- Ask ONE question at a time
+- Be warm, curious, and validating
+- Use their name (${capitalizedName}) to maintain connection
+`;
+        break;
       case 'gathering-intensity':
         systemPrompt += `
 **CURRENT STATE: gathering-intensity**
@@ -858,88 +921,88 @@ Note: The frontend will decide whether to continue tapping, offer a choice, or m
       case 'advice':
         const initialIntensity = sessionContext.initialIntensity || 10;
         const finalIntensity = sessionContext.currentIntensity || 0;
-        const improvement = initialIntensity - finalIntensity;
-        const improvementPercentage = initialIntensity 
-          ? Math.round((improvement / initialIntensity) * 100) 
-          : 0;
-        const deepeningAttempts = sessionContext.deepeningAttempts || 0;
-        const totalRoundsWithoutReduction = sessionContext.totalRoundsWithoutReduction || 0;
-        const reachedStrikeLimit = totalRoundsWithoutReduction >= 3;
+        const improvementVal = initialIntensity - finalIntensity;
+        const improvementPct = initialIntensity > 0 ? Math.round((improvementVal / initialIntensity) * 100) : 0;
+        const feelingWord = sessionContext.feeling || 'this feeling';
+        const bodyLoc = sessionContext.bodyLocation || 'your body';
+        const problemDesc = sessionContext.problem || 'what you were dealing with';
+        const totalRoundsNoReduction = sessionContext.totalRoundsWithoutReduction || 0;
+        const deepeningCount = sessionContext.deepeningAttempts || 0;
+        const hitStrikeLimit = totalRoundsNoReduction >= 3;
         
         systemPrompt += `
 **CURRENT STATE: advice**
 
-The user has completed their tapping session. Generate personalized advice based on their results.
+The tapping session is complete. Generate personalized therapeutic advice based on the session.
 
 **Session Summary:**
-- Problem: "${sessionContext.problem}"
-- Emotion: "${sessionContext.feeling}"
-- Body location: "${sessionContext.bodyLocation}"
+- ${capitalizedName} was dealing with: ${problemDesc}
+- They were feeling: ${feelingWord}
+- They felt it in: ${bodyLoc}
 - Initial intensity: ${initialIntensity}/10
 - Final intensity: ${finalIntensity}/10
-- Improvement: ${improvement} points (${improvementPercentage}%)
+- Improvement: ${improvementPct}%
 - Rounds completed: ${sessionContext.round || 1}
-- Deepening conversations: ${deepeningAttempts}
-- Reached 3-strike limit: ${reachedStrikeLimit ? 'Yes' : 'No'}
+- Deepening conversations: ${deepeningCount}
+${hitStrikeLimit ? '- NOTE: They reached the 3-round limit without significant reduction' : ''}
 
-${reachedStrikeLimit ? `
-**SPECIAL CONTEXT: 3-Strike Limit Reached**
-The user went through ${totalRoundsWithoutReduction} rounds without significant reduction (intensity stayed >= 5). 
-${deepeningAttempts > 0 ? `They also tried ${deepeningAttempts} deepening conversation(s) to explore underlying issues.` : ''}
+**Format Requirements (CRITICAL - follow exactly):**
 
-Your advice should:
-- Validate their experience without judgment - this doesn't mean failure
-- Acknowledge that some emotions are deeply rooted and need more time or support
-- Suggest that coming back later when they feel ready can be helpful
-- Recommend trying EFT with a certified practitioner for deeper issues
-- Provide alternative coping strategies (breathing exercises, journaling, movement, grounding techniques)
-- If this is a recurring pattern, gently encourage seeking professional therapeutic support
-- Be warm and supportive - they've done important work even if the number didn't drop
-` : ''}
+1. **Two paragraphs of reflection:**
+   - First paragraph: Acknowledge their specific emotion (${feelingWord}) and how it showed up in their ${bodyLoc}. Validate their experience.
+   - Second paragraph: Reflect on the progress they made (or validate the work they did if progress was limited).
 
-**Advice Generation Guidelines:**
+2. **A "Try this next:" section with 4-5 bullet points:**
+   - Start with "Try this next:" on its own line
+   - Each bullet should start with "- " (dash space)
+   - NO emojis in the bullets
+   - Make suggestions specific to their situation (${problemDesc})
+   - Include practical, evidence-based coping strategies
 
-Generate 4-6 personalized bullet points based on the outcome tier:
+3. **Closing line:**
+   - End with ONE warm, encouraging sentence
+   - This is the ONLY place for an emoji (use 💚 at the end)
+   - Example: "I'm here whenever you need me. 💚"
 
-${finalIntensity === 0 ? `
-**TIER: Complete Relief (0/10)**
-- Start with celebration emoji and acknowledgment of achievement
-- Provide maintenance strategies (practice the same sequence when similar feelings arise)
-- Suggest daily preventive practice (5-minute morning sessions)
-- Recommend journaling to track triggers and patterns
-- Encourage sharing progress with trusted support network
-` : improvementPercentage >= 70 ? `
-**TIER: Excellent Progress (70%+ improvement)**
-- Acknowledge the significant progress with celebration emoji (from ${initialIntensity} to ${finalIntensity})
-- Suggest continuing with another session in 2-3 hours
-- Recommend complementary breathing exercises throughout the day
-- Emphasize building the habit for increasing effectiveness
-- Note that remaining intensity can likely be reduced further
-` : improvementPercentage >= 40 ? `
-**TIER: Good Progress (40-69% improvement)**
-- Recognize the positive progress with supportive emoji (from ${initialIntensity} to ${finalIntensity})
-- Encourage patience with the healing process
-- Suggest exploring underlying connected concerns
-- Emphasize self-compassion and that healing takes time
-- Recommend professional support if anxiety persists
+${hitStrikeLimit ? `
+**SPECIAL CONTEXT: They did the work but intensity stayed high**
+- Validate that some emotions need more time or deeper work
+- Suggest this might be pointing to something that needs professional support
+- Recommend trying again when they feel ready
+- Be extra compassionate — they showed up and did the work
+` : improvementPct >= 70 ? `
+**SPECIAL CONTEXT: Excellent progress**
+- Celebrate their achievement warmly
+- Suggest maintenance strategies
+- Encourage building on this success
+` : improvementPct >= 40 ? `
+**SPECIAL CONTEXT: Good progress**
+- Acknowledge the meaningful shift
+- Suggest patience with the healing process
+- Recommend continuing the work
 ` : `
-**TIER: Some Progress (<40% improvement)**
-- Validate that every step counts with encouraging emoji (reduced from ${initialIntensity} to ${finalIntensity})
-- Suggest trying different tapping approaches or phrases
-- Recommend considering professional therapeutic support
-- Encourage reaching out to support network
-- Suggest exploring additional EFT resources and guided sessions
-- If severe, recommend consulting healthcare provider
+**SPECIAL CONTEXT: Some progress**
+- Validate that every step matters
+- Be encouraging without minimizing their experience
+- Suggest alternative approaches or professional support
 `}
 
-**Format Requirements:**
-- Each bullet point should start with an emoji (🎉, 💡, 🌱, 📝, 🤝, ✨, 🔄, ⏰, 🧘, 💪, 👍, 🎯, 🔍, 🤲, 📞, 🌟, 🔬, 🏥, 👥, 📚, ⚕️)
-- Use warm, encouraging, supportive tone
-- Reference the user's specific problem ("${sessionContext.problem}"), emotion ("${sessionContext.feeling}"), and body location ("${sessionContext.bodyLocation}") naturally in the advice
-- Include concrete numbers when discussing improvement (${initialIntensity}/10 → ${finalIntensity}/10)
-- Keep each point concise but meaningful (1-2 sentences max per point)
+**Example of correct format:**
 
-After providing the advice, you MUST include this exact directive:
+${capitalizedName}, that ${feelingWord} you were holding in your ${bodyLoc} is real and valid. [Continue with personalized reflection on their experience with ${problemDesc}...]
+
+[Second paragraph about their progress or validation of their effort...]
+
+Try this next:
+- Practice this tapping sequence when similar feelings come up
+- Take a few deep breaths when you notice tension in your ${bodyLoc}
+- [More specific suggestions based on their ${problemDesc}...]
+- Consider journaling about what came up today
+- Reach out to someone you trust if you need support
+
+I'm here whenever you need me. 💚
+
+**After providing advice, include:**
 <<DIRECTIVE {"next_state":"complete"}>>
 `;
         break;
@@ -1019,9 +1082,9 @@ After providing the advice, you MUST include this exact directive:
         const toolArgs = JSON.parse(toolCall.function.arguments);
         console.log('[eft-chat] Tool call successful:', JSON.stringify(toolArgs));
         
-        // Build the directive from tool output
+        // Build the directive from tool output - transition to SETUP, not tapping-point
         extractedDirective = {
-          next_state: 'tapping-point',
+          next_state: 'setup',
           tapping_point: 0,
           setup_statements: toolArgs.setup_statements,
           statement_order: [0, 1, 2, 0, 1, 2, 1, 0],
@@ -1029,7 +1092,7 @@ After providing the advice, you MUST include this exact directive:
         };
         
         // Use the visible response from tool or fallback
-        aiResponse = toolArgs.visible_response || `Thank you, ${capitalizedName}. Take a deep breath in... and breathe out. Let's begin the tapping now.`;
+        aiResponse = toolArgs.visible_response || `Thank you, ${capitalizedName}. Take a deep breath in... and breathe out. Let's begin the setup.`;
         
         // Append the directive in the expected format for downstream parsing
         aiResponse += `\n\n<<DIRECTIVE ${JSON.stringify(extractedDirective)}>>`;

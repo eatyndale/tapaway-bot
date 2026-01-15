@@ -335,16 +335,21 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         console.log('[useAIChat] Directive next_state:', next);
         console.log('[useAIChat] Directive tapping_point:', directive.tapping_point);
         
-        // Start-of-round: store statements + order
-        if (next === 'tapping-point' && directive.tapping_point === 0) {
+        // Start-of-round: store statements + order (for both 'setup' and 'tapping-point' transitions)
+        if ((next === 'setup' || next === 'tapping-point') && directive.setup_statements) {
           const setupStatements = directive.setup_statements ?? updatedContext.setupStatements ?? [];
-          const statementOrder = directive.statement_order ?? updatedContext.statementOrder ?? [];
+          const statementOrder = directive.statement_order ?? updatedContext.statementOrder ?? [0, 1, 2, 0, 1, 2, 1, 0];
           console.log('[useAIChat] Storing setup statements:', setupStatements);
           console.log('[useAIChat] Storing statement order:', statementOrder);
           updatedContext.setupStatements = setupStatements;
           updatedContext.statementOrder = statementOrder;
           setSessionContext(updatedContext);
           onSessionUpdate(updatedContext);
+          
+          // Reset tapping point for new round
+          if (next === 'setup') {
+            setCurrentTappingPoint(0);
+          }
         }
 
         // Point advancement: update current tapping point
@@ -359,12 +364,13 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           
           // Validate state transitions (warning only, don't block)
           const validTransitions: Record<string, string[]> = {
-            'conversation': ['gathering-intensity'],
+            'conversation': ['gathering-intensity', 'conversation-deepening'],
+            'conversation-deepening': ['setup', 'conversation-deepening'],
             'gathering-intensity': ['setup'],
             'setup': ['tapping-point'],
             'tapping-point': ['tapping-point', 'tapping-breathing'],
             'tapping-breathing': ['post-tapping'],
-            'post-tapping': ['setup', 'conversation', 'advice'],
+            'post-tapping': ['setup', 'conversation', 'conversation-deepening', 'advice'],
             'advice': ['complete', 'conversation']
           };
           
@@ -595,7 +601,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       
     } else if (newIntensity >= 5 && totalRoundsWithoutReduction >= 1) {
       // AUTO-DEEPENING: Intensity still >= 5 after a round, trigger deepening conversation
-      console.log('[useAIChat] Intensity still >= 5, triggering conversation deepening');
+      console.log('[useAIChat] Intensity still >= 5, triggering conversation-deepening state');
       
       const deepeningContext = {
         ...updatedContext,
@@ -606,25 +612,13 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       setSessionContext(deepeningContext);
       onSessionUpdate(deepeningContext);
       
-      // Add transition message
-      const transitionMessage: Message = {
-        id: `deepening-${Date.now()}`,
-        type: 'bot',
-        content: `I notice your intensity is still at ${newIntensity}/10. Sometimes there's more beneath the surface. Let's explore a bit deeper...`,
-        timestamp: new Date(),
-        sessionId: currentChatSession
-      };
+      // Transition to dedicated deepening state (not regular conversation)
+      onStateChange('conversation-deepening');
       
-      setMessages(prev => [...prev, transitionMessage]);
-      setConversationHistory(prev => [...prev, transitionMessage]);
-      
-      // Transition to conversation for deepening
-      onStateChange('conversation');
-      
-      // Send deepening context to AI
+      // Send deepening context to AI - this will trigger the AI to ask probing questions
       await sendMessage(
-        `My intensity is still at ${newIntensity}/10 after tapping. I need to explore deeper.`,
-        'conversation',
+        `My intensity is still at ${newIntensity}/10 after tapping. I need to explore what's really underneath this.`,
+        'conversation-deepening',
         deepeningContext
       );
       
@@ -700,12 +694,12 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         break;
         
       case 'gathering-intensity':
-        if (response.includes('tapping') || response.includes('visual guide') || response.includes('follow along')) {
-          console.log('[useAIChat] Detected tapping transition, moving to tapping-point');
-          return 'tapping-point';
+        if (response.includes('tapping') || response.includes('visual guide') || response.includes('follow along') || response.includes('setup') || response.includes('karate chop')) {
+          console.log('[useAIChat] Detected setup/tapping transition, moving to setup');
+          return 'setup';
         }
-        console.log('[useAIChat] ⚠️ Fallback: assuming transition to tapping-point');
-        return 'tapping-point';
+        console.log('[useAIChat] ⚠️ Fallback: assuming transition to setup');
+        return 'setup';
 
       case 'tapping-point':
         if (currentTappingPoint < 7) {

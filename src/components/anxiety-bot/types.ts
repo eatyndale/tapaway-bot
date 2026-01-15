@@ -1,4 +1,4 @@
-export type ChatState = 'questionnaire' | 'conversation' | 'gathering-intensity' | 'setup' | 'tapping-point' | 'tapping-breathing' | 'post-tapping' | 'advice' | 'complete';
+export type ChatState = 'questionnaire' | 'conversation' | 'conversation-deepening' | 'gathering-intensity' | 'setup' | 'tapping-point' | 'tapping-breathing' | 'post-tapping' | 'advice' | 'complete';
 
 export type ReminderPhraseType = 'acknowledging' | 'partial-release' | 'full-release';
 export interface QuestionnaireResponse {
