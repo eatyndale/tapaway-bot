@@ -38,6 +38,7 @@ interface TappingGuideProps {
   reminderPhraseType?: 'acknowledging' | 'partial-release' | 'full-release';
   feeling?: string;
   bodyLocation?: string;
+  problem?: string;  // problem context for fallback phrases
   onComplete: () => void;
   onPointChange?: (pointIndex: number) => void;
 }
@@ -88,53 +89,46 @@ const convertToNounForm = (emotion: string): string => {
 };
 
 // Generate dynamic reminder phrases based on type (fallback when AI phrases not available)
+// Uses the new format: "[emotion] in my [body], [context], but I want to let it go."
 const generateReminderPhrase = (
   type: 'acknowledging' | 'partial-release' | 'full-release',
   feeling: string,
   bodyLocation: string,
-  pointIndex: number
+  pointIndex: number,
+  problem?: string
 ): string => {
   // Convert feeling to noun form for grammatically correct phrases
   const feelingNoun = convertToNounForm(feeling);
+  const problemContext = problem || 'what happened';
   
   const acknowledgingPhrases = [
-    `This ${feelingNoun}`,
-    `I'm feeling this ${feelingNoun}`,
-    `This ${feelingNoun} I'm experiencing`,
-    `This ${feelingNoun} in my ${bodyLocation}`,
-    `I'm holding onto this ${feelingNoun}`,
-    `This feeling in my ${bodyLocation}`,
-    `Still feeling this ${feelingNoun}`,
-    `This remaining ${feelingNoun}`
+    `This ${feelingNoun} in my ${bodyLocation}, ${problemContext}, but I want to let it go.`,
+    `This ${feelingNoun} I'm holding, ${problemContext}, but I'm okay.`,
+    `This ${feelingNoun} in my ${bodyLocation}, ${problemContext}, but I accept myself.`
   ];
 
   const partialReleasePhrases = [
-    `I'm beginning to let this ${feelingNoun} go`,
-    `I'd like to release this ${feelingNoun}`,
-    `I'm ready to let go of some of this`,
-    `This ${feelingNoun} is starting to shift`,
-    `I'm making progress with this ${feelingNoun}`,
-    `Starting to release this ${feelingNoun}`,
-    `Letting some of this go`,
-    `This ${feelingNoun} is easing`
+    `This ${feelingNoun} in my ${bodyLocation}, ${problemContext}, but I'm choosing peace.`,
+    `This ${feelingNoun} I'm feeling, ${problemContext}, and it's starting to shift.`,
+    `This ${feelingNoun} in my ${bodyLocation}, ${problemContext}, but I'm choosing calm.`
   ];
 
   const fullReleasePhrases = [
-    `I am releasing this ${feelingNoun}`,
-    `I am letting it go`,
-    `I don't need this ${feelingNoun}`,
-    `Ready to release this emotion`,
-    `I've felt this, but I'm letting it go`,
-    `It's time to let go of this`,
-    `It's safe to let this go`,
-    `Releasing this ${feelingNoun} now`
+    `This ${feelingNoun} in my ${bodyLocation}, ${problemContext}, I'm releasing this now.`,
+    `This ${feelingNoun} I've been holding, ${problemContext}, I'm letting go.`
   ];
 
-  const phrases = type === 'acknowledging' 
-    ? acknowledgingPhrases 
-    : type === 'partial-release' 
-      ? partialReleasePhrases 
-      : fullReleasePhrases;
+  let phrases: string[];
+  
+  // Select phrase set based on point index (8 points total)
+  // Points 0-2: acknowledging, Points 3-5: partial-release, Points 6-7: full-release
+  if (pointIndex < 3) {
+    phrases = acknowledgingPhrases;
+  } else if (pointIndex < 6) {
+    phrases = partialReleasePhrases;
+  } else {
+    phrases = fullReleasePhrases;
+  }
 
   return phrases[pointIndex % phrases.length];
 };
@@ -146,6 +140,7 @@ const TappingGuide = ({
   reminderPhraseType = 'acknowledging',
   feeling = 'this feeling',
   bodyLocation = 'body',
+  problem,
   onComplete, 
   onPointChange 
 }: TappingGuideProps) => {
@@ -249,8 +244,8 @@ const TappingGuide = ({
     if (setupStatementText) {
       statementText = setupStatementText;
     } else {
-      // Last resort: generate a phrase locally
-      statementText = generateReminderPhrase(reminderPhraseType, feeling, bodyLocation, currentPoint);
+      // Last resort: generate a phrase locally with problem context
+      statementText = generateReminderPhrase(reminderPhraseType, feeling, bodyLocation, currentPoint, problem);
     }
   }
 

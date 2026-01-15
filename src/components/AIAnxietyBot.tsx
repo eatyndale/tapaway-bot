@@ -297,6 +297,7 @@ const AIAnxietyBot = () => {
             reminderPhraseType={sessionContext.reminderPhraseType || 'acknowledging'}
             feeling={sessionContext.feeling || 'this feeling'}
             bodyLocation={sessionContext.bodyLocation || 'body'}
+            problem={sessionContext.problem}
             onComplete={() => setChatState('tapping-breathing')}
             onPointChange={setCurrentTappingPoint}
           />
