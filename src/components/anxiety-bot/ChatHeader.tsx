@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { RotateCcw, History, Sparkles } from "lucide-react";
+import { RotateCcw, Sparkles } from "lucide-react";
 import { QuestionnaireSession } from "./types";
 
 interface ChatHeaderProps {
@@ -42,25 +42,14 @@ const ChatHeader = ({
         </div>
       </div>
       
-      <div className="flex gap-2">
-        <Button 
-          variant="outline" 
-          onClick={onToggleHistory}
-          size="sm"
-          className={`transition-all duration-300 ${showHistory ? 'bg-primary/10 border-primary/30' : ''}`}
-        >
-          <History className="w-4 h-4 mr-2" />
-          History
-        </Button>
-        <Button 
-          variant="outline" 
-          onClick={onStartNewSession}
-          size="sm"
-        >
-          <RotateCcw className="w-4 h-4 mr-2" />
-          New Session
-        </Button>
-      </div>
+      <Button 
+        variant="outline" 
+        onClick={onStartNewSession}
+        size="sm"
+      >
+        <RotateCcw className="w-4 h-4 mr-2" />
+        New Session
+      </Button>
     </div>
   );
 };
