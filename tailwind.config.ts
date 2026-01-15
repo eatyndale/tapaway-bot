@@ -19,8 +19,10 @@ export default {
 			}
 		},
 		extend: {
-		fontFamily: {
+			fontFamily: {
 				'sans': ['Inter', 'sans-serif'],
+				'serif': ['Lora', 'serif'],
+				'heading': ['Lora', 'serif'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',
@@ -68,9 +70,21 @@ export default {
 				}
 			},
 			borderRadius: {
+				'3xl': '1.5rem',
+				'4xl': '2rem',
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
+			},
+			spacing: {
+				'18': '4.5rem',
+				'22': '5.5rem',
+			},
+			boxShadow: {
+				'soft': 'var(--shadow-soft)',
+				'warm': 'var(--shadow-warm)',
+				'elevated': 'var(--shadow-elevated)',
+				'glow': 'var(--shadow-glow)',
 			},
 			keyframes: {
 				'accordion-down': {
@@ -99,6 +113,26 @@ export default {
 						transform: 'translateY(0)'
 					}
 				},
+				'fade-in-up': {
+					'0%': {
+						opacity: '0',
+						transform: 'translateY(20px)'
+					},
+					'100%': {
+						opacity: '1',
+						transform: 'translateY(0)'
+					}
+				},
+				'fade-in-scale': {
+					'0%': {
+						opacity: '0',
+						transform: 'scale(0.95)'
+					},
+					'100%': {
+						opacity: '1',
+						transform: 'scale(1)'
+					}
+				},
 				'breathe': {
 					'0%, 100%': {
 						opacity: '1',
@@ -108,13 +142,49 @@ export default {
 						opacity: '0.85',
 						transform: 'scale(1.02)'
 					}
+				},
+				'pulse-soft': {
+					'0%, 100%': {
+						opacity: '1'
+					},
+					'50%': {
+						opacity: '0.7'
+					}
+				},
+				'float': {
+					'0%, 100%': {
+						transform: 'translateY(0)'
+					},
+					'50%': {
+						transform: 'translateY(-6px)'
+					}
+				},
+				'glow-pulse': {
+					'0%, 100%': {
+						boxShadow: '0 0 20px hsl(190 58% 56% / 0.2)'
+					},
+					'50%': {
+						boxShadow: '0 0 30px hsl(190 58% 56% / 0.4)'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'fade-in': 'fade-in 0.6s ease-out',
-				'breathe': 'breathe 4s ease-in-out infinite'
+				'fade-in-up': 'fade-in-up 0.5s ease-out',
+				'fade-in-scale': 'fade-in-scale 0.4s ease-out',
+				'breathe': 'breathe 4s ease-in-out infinite',
+				'pulse-soft': 'pulse-soft 3s ease-in-out infinite',
+				'float': 'float 4s ease-in-out infinite',
+				'glow-pulse': 'glow-pulse 3s ease-in-out infinite'
+			},
+			transitionTimingFunction: {
+				'therapeutic': 'cubic-bezier(0.4, 0, 0.2, 1)',
+			},
+			transitionDuration: {
+				'400': '400ms',
+				'600': '600ms',
 			}
 		}
 	},
