@@ -14,6 +14,7 @@ interface SessionContext {
   round?: number;
   setupStatements?: string[];
   reminderPhrases?: string[];
+  aiReminderPhrases?: string[];  // AI-generated natural reminder phrases (8 total)
   statementOrder?: number[];
   tappingSessionId?: string;
   roundsWithoutReduction?: number;
@@ -373,14 +374,20 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         console.log('[useAIChat] Directive next_state:', next);
         console.log('[useAIChat] Directive tapping_point:', directive.tapping_point);
         
-        // Start-of-round: store statements + order (for both 'setup' and 'tapping-point' transitions)
+        // Start-of-round: store statements + order + AI reminder phrases (for both 'setup' and 'tapping-point' transitions)
         if ((next === 'setup' || next === 'tapping-point') && directive.setup_statements) {
           const setupStatements = directive.setup_statements ?? persistedContext.setupStatements ?? [];
           const statementOrder = directive.statement_order ?? persistedContext.statementOrder ?? [0, 1, 2, 0, 1, 2, 1, 0];
+          // Store AI-generated reminder phrases if provided
+          const aiReminderPhrases = (directive as any).reminder_phrases ?? persistedContext.aiReminderPhrases ?? null;
           console.log('[useAIChat] Storing setup statements:', setupStatements);
           console.log('[useAIChat] Storing statement order:', statementOrder);
+          console.log('[useAIChat] Storing AI reminder phrases:', aiReminderPhrases);
           persistedContext.setupStatements = setupStatements;
           persistedContext.statementOrder = statementOrder;
+          if (aiReminderPhrases) {
+            (persistedContext as any).aiReminderPhrases = aiReminderPhrases;
+          }
           setSessionContext(persistedContext);
           onSessionUpdate(persistedContext);
           
@@ -500,10 +507,33 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       'full-release'
     );
     
+    // Helper function to convert adjective emotions to noun forms
+    const convertEmotionToNoun = (emotion: string): string => {
+      const lower = emotion.toLowerCase().trim();
+      const emotionToNoun: Record<string, string> = {
+        'anxious': 'anxiety', 'sad': 'sadness', 'stressed': 'stress',
+        'overwhelmed': 'overwhelm', 'tired': 'tiredness', 'exhausted': 'exhaustion',
+        'worried': 'worry', 'scared': 'fear', 'afraid': 'fear',
+        'frustrated': 'frustration', 'angry': 'anger', 'depressed': 'depression',
+        'nervous': 'nervousness', 'lonely': 'loneliness', 'hopeless': 'hopelessness',
+        'helpless': 'helplessness', 'panicked': 'panic', 'terrified': 'terror',
+        'disappointed': 'disappointment', 'guilty': 'guilt', 'ashamed': 'shame',
+        'embarrassed': 'embarrassment', 'jealous': 'jealousy', 'resentful': 'resentment',
+        'bitter': 'bitterness', 'insecure': 'insecurity', 'confused': 'confusion'
+      };
+      if (emotionToNoun[lower]) return emotionToNoun[lower];
+      // If already ends with noun suffixes, return as-is
+      if (lower.endsWith('ness') || lower.endsWith('tion') || lower.endsWith('ment') || 
+          lower.endsWith('ity') || lower.endsWith('ion')) return lower;
+      return `${emotion} feeling`;
+    };
+    
+    const feelingNoun = convertEmotionToNoun(feeling);
+    
     const newSetupStatements = [
-      `Even though I still have this ${feeling} in my ${bodyLocation}, I deeply and completely accept myself`,
+      `Even though I still have this ${feelingNoun} in my ${bodyLocation}, I deeply and completely accept myself`,
       `Even though ${problem} is still affecting me, I choose to accept myself anyway`,
-      `Even with this remaining ${feeling}, I'm making progress and I accept myself`
+      `Even with this remaining ${feelingNoun}, I'm making progress and I accept myself`
     ];
     
     const statementOrder = [0, 1, 2, 0, 1, 2, 1, 0]; // Standard order

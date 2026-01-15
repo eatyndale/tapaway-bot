@@ -113,6 +113,58 @@ function normalizeEmotionForSpeech(emotion: string): string {
   return emotion.toLowerCase().trim();
 }
 
+// Convert adjective emotions to noun forms for grammatically correct statements
+function convertToNoun(emotion: string): string {
+  if (!emotion) return 'this feeling';
+  
+  const lower = emotion.toLowerCase().trim();
+  
+  const adjectiveToNoun: Record<string, string> = {
+    'anxious': 'anxiety',
+    'sad': 'sadness',
+    'stressed': 'stress',
+    'overwhelmed': 'overwhelm',
+    'tired': 'tiredness',
+    'exhausted': 'exhaustion',
+    'worried': 'worry',
+    'scared': 'fear',
+    'afraid': 'fear',
+    'frustrated': 'frustration',
+    'angry': 'anger',
+    'depressed': 'depression',
+    'nervous': 'nervousness',
+    'lonely': 'loneliness',
+    'hopeless': 'hopelessness',
+    'helpless': 'helplessness',
+    'panicked': 'panic',
+    'terrified': 'terror',
+    'disappointed': 'disappointment',
+    'guilty': 'guilt',
+    'ashamed': 'shame',
+    'embarrassed': 'embarrassment',
+    'jealous': 'jealousy',
+    'resentful': 'resentment',
+    'bitter': 'bitterness',
+    'insecure': 'insecurity',
+    'uncertain': 'uncertainty',
+    'confused': 'confusion'
+  };
+  
+  // Check if it's already a noun form or in our mapping
+  if (adjectiveToNoun[lower]) {
+    return adjectiveToNoun[lower];
+  }
+  
+  // Check if word ends in common noun suffixes (already a noun)
+  if (lower.endsWith('ness') || lower.endsWith('tion') || lower.endsWith('ment') || 
+      lower.endsWith('ity') || lower.endsWith('ty') || lower.endsWith('ion')) {
+    return lower;
+  }
+  
+  // For unknown emotions, wrap in "feeling of" to ensure grammatical correctness
+  return `this ${lower} feeling`;
+}
+
 // Check if two words are semantically related (for avoiding redundancy)
 function areSemanticallyRelated(word1: string, word2: string): boolean {
   if (!word1 || !word2) return false;
@@ -563,35 +615,98 @@ serve(async (req) => {
     if (sanitizedChatState === 'conversation' && hasAllRequiredData) {
       console.log('[eft-chat] Auto-advancing: we have all data, moving to gathering-intensity');
       
-      // Build natural auto-advance response with smart redundancy handling
+      // Use AI to generate a natural, grammatically correct intensity gathering statement
       const capitalizedName = capitalizeName(sanitizedUserName);
-      const feelingAdj = normalizeEmotionForSpeech(sessionContext.feeling);
+      const feeling = sessionContext.feeling;
       const location = sessionContext.bodyLocation;
       const problem = sessionContext.problem;
-      const locationPhrase = formatBodyLocation(location);
 
-      let autoAdvanceResponse: string;
+      const intensityPrompt = `Generate a brief, natural acknowledgment for an EFT session.
 
-      if (areSemanticallyRelated(sessionContext.feeling, problem)) {
-        // Feeling IS the problem - don't repeat it, use a single combined phrase
-        autoAdvanceResponse = `Got it ${capitalizedName} — this ${feelingAdj} ${locationPhrase}. How intense is that right now on a 0–10?`;
-      } else {
-        // Problem and feeling are different - include both
-        autoAdvanceResponse = `Got it ${capitalizedName} — this ${feelingAdj} about ${problem}, sitting ${locationPhrase}. How intense is that right now on a 0–10?`;
-      }
-      
-      return new Response(JSON.stringify({
-        response: `${autoAdvanceResponse}\n\n<<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>`,
-        crisisDetected: false,
-        extractedContext: {
-          problem: sessionContext.problem,
-          feeling: sessionContext.feeling,
-          bodyLocation: sessionContext.bodyLocation,
-          currentIntensity: sessionContext.currentIntensity
+User: ${capitalizedName}
+Their problem: ${problem}
+Their feeling: ${feeling}
+Where they feel it: ${location}
+
+Write ONE warm, grammatically correct sentence that:
+1. Acknowledges what they shared using natural phrasing
+2. Asks "How intense is that right now on a 0–10?"
+
+CRITICAL GRAMMAR RULES:
+- NEVER say "this disappointed" or "this anxious" - those are adjectives used as nouns (WRONG)
+- Use proper constructions like:
+  - "you're feeling disappointed about..." (adjective with "feeling")
+  - "this disappointment about..." (noun form)
+  - "the anxiety you're experiencing..." (noun with article)
+
+Examples of GOOD phrasing:
+- "I hear you, Duke — you're feeling disappointed about work stress, and it's sitting in your chest. How intense is that right now on a 0–10?"
+- "So there's this sadness about your boss's behavior, showing up in your stomach. How intense is that right now on a 0–10?"
+- "Got it — this overwhelm from work deadlines is weighing on your shoulders. How intense is that right now on a 0–10?"
+
+Keep it warm and conversational. One sentence max before the intensity question.`;
+
+      try {
+        const intensityGenResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: intensityPrompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 150,
+          }),
+        });
+
+        const intensityGenData = await intensityGenResponse.json();
+        let autoAdvanceResponse: string;
+        
+        if (intensityGenResponse.ok && intensityGenData.choices?.[0]?.message?.content) {
+          autoAdvanceResponse = intensityGenData.choices[0].message.content.trim();
+          console.log('[eft-chat] AI-generated intensity statement:', autoAdvanceResponse);
+        } else {
+          // Fallback to simple but grammatically correct template
+          const feelingNoun = convertToNoun(feeling);
+          autoAdvanceResponse = `Got it ${capitalizedName} — I hear you're dealing with ${feelingNoun} about ${problem}. How intense is that right now on a 0–10?`;
+          console.log('[eft-chat] Using fallback intensity statement');
         }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+        
+        return new Response(JSON.stringify({
+          response: `${autoAdvanceResponse}\n\n<<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>`,
+          crisisDetected: false,
+          extractedContext: {
+            problem: sessionContext.problem,
+            feeling: sessionContext.feeling,
+            bodyLocation: sessionContext.bodyLocation,
+            currentIntensity: sessionContext.currentIntensity
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('[eft-chat] Error generating intensity statement:', error);
+        // Fallback
+        const feelingNoun = convertToNoun(feeling);
+        const autoAdvanceResponse = `Got it ${capitalizedName} — I hear you're dealing with ${feelingNoun} about ${problem}. How intense is that right now on a 0–10?`;
+        
+        return new Response(JSON.stringify({
+          response: `${autoAdvanceResponse}\n\n<<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>`,
+          crisisDetected: false,
+          extractedContext: {
+            problem: sessionContext.problem,
+            feeling: sessionContext.feeling,
+            bodyLocation: sessionContext.bodyLocation,
+            currentIntensity: sessionContext.currentIntensity
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // ============================================================================
@@ -1019,23 +1134,30 @@ I'm here whenever you need me. 💚
       type: "function" as const,
       function: {
         name: "generate_tapping_directive",
-        description: "Generate the tapping directive with setup statements for EFT therapy",
+        description: "Generate the tapping directive with setup statements and reminder phrases for EFT therapy",
         parameters: {
           type: "object",
           properties: {
             setup_statements: {
               type: "array",
               items: { type: "string" },
-              description: "Array of exactly 3 varied EFT setup statements",
+              description: "Array of exactly 3 varied EFT setup statements. Each MUST be grammatically correct. Use NOUN forms after 'this' (e.g., 'this anxiety' not 'this anxious').",
               minItems: 3,
               maxItems: 3
+            },
+            reminder_phrases: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of 8 natural reminder phrases for tapping points. Vary style: first 3 acknowledging (e.g., 'This anxiety', 'I'm feeling this tension'), middle 3 partial-release (e.g., 'Letting this go', 'This feeling is shifting'), last 2 full-release (e.g., 'Releasing this now', 'I'm letting go'). Each phrase should be 3-8 words, grammatically correct.",
+              minItems: 8,
+              maxItems: 8
             },
             visible_response: {
               type: "string",
               description: "Short supportive message to show the user (1-2 sentences)"
             }
           },
-          required: ["setup_statements", "visible_response"]
+          required: ["setup_statements", "reminder_phrases", "visible_response"]
         }
       }
     };
@@ -1089,6 +1211,7 @@ I'm here whenever you need me. 💚
           next_state: 'setup',
           tapping_point: 0,
           setup_statements: toolArgs.setup_statements,
+          reminder_phrases: toolArgs.reminder_phrases || null,
           statement_order: [0, 1, 2, 0, 1, 2, 1, 0],
           say_index: 0
         };
@@ -1101,6 +1224,7 @@ I'm here whenever you need me. 💚
         
         console.log('[eft-chat] ✅ Setup statements generated via tool calling');
         console.log('[eft-chat] Statements:', toolArgs.setup_statements);
+        console.log('[eft-chat] Reminder phrases:', toolArgs.reminder_phrases);
       } else {
         console.error('[eft-chat] Tool call failed, falling back to regular response');
         throw new Error('Tool call did not return expected function');
@@ -1199,6 +1323,7 @@ Generate 3 EFT setup statements. Use the NOUN form of the emotion.`;
             next_state: 'setup',
             tapping_point: 0,
             setup_statements: toolArgs.setup_statements,
+            reminder_phrases: toolArgs.reminder_phrases || null,
             statement_order: [0, 1, 2, 0, 1, 2, 1, 0],
             say_index: 0,
             collect: 'none'
@@ -1455,6 +1580,7 @@ Examples: anxious → anxiety, sad → sadness, stressed → stress, "not enough
               next_state: 'setup',
               tapping_point: 0,
               setup_statements: toolArgs.setup_statements,
+              reminder_phrases: toolArgs.reminder_phrases || null,
               statement_order: [0, 1, 2, 0, 1, 2, 1, 0],
               say_index: 0,
               collect: 'none'

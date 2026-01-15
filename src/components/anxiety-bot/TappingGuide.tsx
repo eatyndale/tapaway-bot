@@ -34,6 +34,7 @@ const tappingPoints: TappingPoint[] = [
 interface TappingGuideProps {
   setupStatements: string[];  // the 3 setup statements
   statementOrder: number[];   // length 8, values in {0,1,2}
+  aiReminderPhrases?: string[];  // AI-generated reminder phrases (8 total, one per point)
   reminderPhraseType?: 'acknowledging' | 'partial-release' | 'full-release';
   feeling?: string;
   bodyLocation?: string;
@@ -41,44 +42,92 @@ interface TappingGuideProps {
   onPointChange?: (pointIndex: number) => void;
 }
 
-// Generate dynamic reminder phrases based on type
+// Convert adjective emotions to noun forms for grammatically correct statements
+const emotionToNoun: Record<string, string> = {
+  'anxious': 'anxiety',
+  'sad': 'sadness',
+  'stressed': 'stress',
+  'overwhelmed': 'overwhelm',
+  'tired': 'tiredness',
+  'exhausted': 'exhaustion',
+  'worried': 'worry',
+  'scared': 'fear',
+  'afraid': 'fear',
+  'frustrated': 'frustration',
+  'angry': 'anger',
+  'depressed': 'depression',
+  'nervous': 'nervousness',
+  'lonely': 'loneliness',
+  'hopeless': 'hopelessness',
+  'helpless': 'helplessness',
+  'panicked': 'panic',
+  'terrified': 'terror',
+  'disappointed': 'disappointment',
+  'guilty': 'guilt',
+  'ashamed': 'shame',
+  'embarrassed': 'embarrassment',
+  'jealous': 'jealousy',
+  'resentful': 'resentment',
+  'bitter': 'bitterness',
+  'insecure': 'insecurity',
+  'confused': 'confusion'
+};
+
+// Convert to noun form if needed
+const convertToNounForm = (emotion: string): string => {
+  const lower = emotion.toLowerCase().trim();
+  if (emotionToNoun[lower]) {
+    return emotionToNoun[lower];
+  }
+  // If already ends with common noun suffixes, return as-is
+  if (lower.endsWith('ness') || lower.endsWith('tion') || lower.endsWith('ment') || 
+      lower.endsWith('ity') || lower.endsWith('ion')) {
+    return lower;
+  }
+  return emotion;
+};
+
+// Generate dynamic reminder phrases based on type (fallback when AI phrases not available)
 const generateReminderPhrase = (
   type: 'acknowledging' | 'partial-release' | 'full-release',
   feeling: string,
   bodyLocation: string,
   pointIndex: number
 ): string => {
+  // Convert feeling to noun form for grammatically correct phrases
+  const feelingNoun = convertToNounForm(feeling);
+  
   const acknowledgingPhrases = [
-    `This ${feeling}`,
-    `I am feeling ${feeling}`,
-    `This ${feeling} I'm feeling`,
-    `This ${feeling} in my ${bodyLocation}`,
-    `I am so ${feeling}`,
+    `This ${feelingNoun}`,
+    `I'm feeling this ${feelingNoun}`,
+    `This ${feelingNoun} I'm experiencing`,
+    `This ${feelingNoun} in my ${bodyLocation}`,
+    `I'm holding onto this ${feelingNoun}`,
     `This feeling in my ${bodyLocation}`,
-    `Still feeling this ${feeling}`,
-    `This remaining ${feeling}`
+    `Still feeling this ${feelingNoun}`,
+    `This remaining ${feelingNoun}`
   ];
 
   const partialReleasePhrases = [
-    `I'm beginning to let this ${feeling} go`,
-    `I'd like to release this ${feeling}`,
-    `I'm ready to let go of some of this ${feeling}`,
-    `This ${feeling} is starting to shift`,
-    `I'm making progress with this ${feeling}`,
-    `Starting to release this ${feeling}`,
-    `Letting some of this ${feeling} go`,
-    `This ${feeling} is easing`
+    `I'm beginning to let this ${feelingNoun} go`,
+    `I'd like to release this ${feelingNoun}`,
+    `I'm ready to let go of some of this`,
+    `This ${feelingNoun} is starting to shift`,
+    `I'm making progress with this ${feelingNoun}`,
+    `Starting to release this ${feelingNoun}`,
+    `Letting some of this go`,
+    `This ${feelingNoun} is easing`
   ];
 
   const fullReleasePhrases = [
-    `I am releasing this ${feeling}`,
+    `I am releasing this ${feelingNoun}`,
     `I am letting it go`,
-    `I don't need this ${feeling}`,
+    `I don't need this ${feelingNoun}`,
     `Ready to release this emotion`,
-    `I've been ${feeling}, but I am letting it go`,
+    `I've felt this, but I'm letting it go`,
     `It's time to let go of this`,
     `It's safe to let this go`,
-    `Releasing this ${feeling} now`
+    `Releasing this ${feelingNoun} now`
   ];
 
   const phrases = type === 'acknowledging' 
@@ -93,13 +142,14 @@ const generateReminderPhrase = (
 const TappingGuide = ({ 
   setupStatements, 
   statementOrder, 
+  aiReminderPhrases,
   reminderPhraseType = 'acknowledging',
   feeling = 'this feeling',
   bodyLocation = 'body',
   onComplete, 
   onPointChange 
 }: TappingGuideProps) => {
-  console.log('[TappingGuide] Rendered with:', { setupStatements, statementOrder, reminderPhraseType });
+  console.log('[TappingGuide] Rendered with:', { setupStatements, statementOrder, aiReminderPhrases, reminderPhraseType });
   
   const [currentPoint, setCurrentPoint] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -184,16 +234,25 @@ const TappingGuide = ({
   const currentTappingPoint = tappingPoints[currentPoint];
   
   // Get the statement/phrase for the current point
-  // For first round, use setup statements; for subsequent rounds, use dynamic reminder phrases
-  const statementIdx = statementOrder[currentPoint] ?? 0;
-  const setupStatementText = setupStatements[statementIdx] || `This feeling at ${currentTappingPoint.name.toLowerCase()}`;
+  // Priority: AI-generated reminder phrases > Setup statements > Fallback generated phrases
+  let statementText: string;
   
-  // Use dynamic reminder phrases based on phrase type
-  const dynamicPhrase = generateReminderPhrase(reminderPhraseType, feeling, bodyLocation, currentPoint);
-  
-  // For the first round (when reminderPhraseType defaults to acknowledging), use setup statements
-  // For subsequent rounds, use the dynamic phrases based on progress
-  const statementText = setupStatementText;
+  if (aiReminderPhrases && aiReminderPhrases.length >= 8 && aiReminderPhrases[currentPoint]) {
+    // Use AI-generated reminder phrase (most natural language)
+    statementText = aiReminderPhrases[currentPoint];
+    console.log('[TappingGuide] Using AI reminder phrase:', statementText);
+  } else {
+    // Fallback to setup statements or generated phrases
+    const statementIdx = statementOrder[currentPoint] ?? 0;
+    const setupStatementText = setupStatements[statementIdx] || null;
+    
+    if (setupStatementText) {
+      statementText = setupStatementText;
+    } else {
+      // Last resort: generate a phrase locally
+      statementText = generateReminderPhrase(reminderPhraseType, feeling, bodyLocation, currentPoint);
+    }
+  }
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
