@@ -169,6 +169,7 @@ function formatBodyLocation(location: string): string {
 function getCollectField(state: string): string {
   const collectMap: Record<string, string> = {
     'conversation': 'conversation',
+    'conversation-deepening': 'conversation',
     'gathering-intensity': 'intensity',
     'post-tapping': 'intensity'
   };
@@ -485,7 +486,8 @@ serve(async (req) => {
     // ============================================================================
     
     if ((classification.relevance === 'no' || classification.relevance === 'maybe') 
-        && sanitizedChatState !== 'conversation') {
+        && sanitizedChatState !== 'conversation'
+        && sanitizedChatState !== 'conversation-deepening') {
       // Pre-filtering ONLY for structured states that need specific input
       console.log(`[eft-chat] Relevance=${classification.relevance} - returning state-specific response for structured state: ${sanitizedChatState}`);
       
@@ -791,25 +793,19 @@ sessionContext.problem?.toLowerCase().includes('work') || sessionContext.problem
 - "Has something like this happened before?"
 - "If you could change one thing about this situation, what would it be?"`}
 
-**Transition Rules:**
-- Keep asking probing questions until you identify a DEEPER or MORE SPECIFIC issue
-- Once you find the deeper issue (new problem + emotion), acknowledge it warmly and generate new setup statements
-
-**When the user reveals something deeper, respond like this:**
-"I see — it's not just [surface issue], it's really about [deeper issue]. That [new emotion as NOUN] makes so much sense. Let's tap on this new layer."
-
-Then transition to setup with NEW setup statements based on the deeper issue:
-<<DIRECTIVE {"next_state":"setup","setup_statements":["Even though I have this [new emotion noun] about [deeper issue], I deeply and completely accept myself","Even though [deeper issue] is affecting me this way, I choose to accept myself anyway","Even though my [body location] is holding this [new emotion noun], I'm okay"],"statement_order":[0,1,2,0,1,2,1,0],"tapping_point":0,"collect":"none"}>>
-
-**If still exploring, stay in this state:**
-<<DIRECTIVE {"next_state":"conversation-deepening","collect":"conversation"}>>
-
-**CRITICAL:** 
+**CRITICAL RULES:**
 - Do NOT ask for intensity — we already have it
 - Do NOT transition to gathering-intensity
+- Do NOT print setup statements in your response text
 - Ask ONE question at a time
 - Be warm, curious, and validating
 - Use their name (${capitalizedName}) to maintain connection
+
+**Your response should ONLY be:**
+- A short validating sentence + ONE probing question
+- End with: <<DIRECTIVE {"next_state":"conversation-deepening","collect":"conversation"}>>
+
+**The system will handle transitioning to tapping when a deeper issue is revealed.**
 `;
         break;
       case 'gathering-intensity':
@@ -1102,6 +1098,160 @@ I'm here whenever you need me. 💚
       } else {
         console.error('[eft-chat] Tool call failed, falling back to regular response');
         throw new Error('Tool call did not return expected function');
+      }
+    } else if (sanitizedChatState === 'conversation-deepening') {
+      // ============================================================================
+      // DEEPENING COMPLETION DETECTION
+      // If the user reveals a deeper issue (new feeling or belief), generate setup
+      // statements via tool calling and transition to setup (not gathering-intensity)
+      // ============================================================================
+      console.log('[eft-chat] conversation-deepening: checking for deeper issue revelation');
+      
+      const previousFeeling = sessionContext.feeling || '';
+      const previousProblem = sessionContext.problem || '';
+      const newFeeling = classification.extracted?.feeling || '';
+      const newProblem = classification.extracted?.problem || '';
+      
+      // Detect if user revealed something deeper
+      const revealedDeeperFeeling = newFeeling && newFeeling !== previousFeeling && newFeeling.length > 0;
+      const revealedDeeperProblem = newProblem && newProblem !== previousProblem && newProblem.length > 0;
+      const revealedDeeper = revealedDeeperFeeling || revealedDeeperProblem;
+      
+      console.log('[eft-chat] Deeper issue check:', {
+        previousFeeling, newFeeling, revealedDeeperFeeling,
+        previousProblem, newProblem, revealedDeeperProblem,
+        revealedDeeper
+      });
+      
+      if (revealedDeeper) {
+        // User revealed a deeper issue - generate setup statements via tool calling
+        console.log('[eft-chat] ✅ Deeper issue revealed! Using tool calling for setup statements');
+        
+        // Update session context with the new deeper values
+        const updatedProblem = newProblem || previousProblem;
+        const updatedFeeling = newFeeling || previousFeeling;
+        const bodyLocation = sessionContext.bodyLocation || 'body';
+        
+        const deepeningToolPrompt = `You are an EFT tapping therapist. The user has just revealed a deeper issue underneath their surface problem.
+
+Previous problem: "${previousProblem}"
+Previous feeling: "${previousFeeling}"
+
+NEW deeper insight from user: "${sanitizedMessage}"
+Extracted new problem: "${updatedProblem}"
+Extracted new feeling: "${updatedFeeling}"
+Body location: "${bodyLocation}"
+
+Generate 3 EFT setup statements for this DEEPER issue. Use the NOUN form of the emotion.
+
+Examples of emotion → noun conversion:
+- anxious → anxiety, sad → sadness, stressed → stress, overwhelmed → overwhelm
+- "not enough" → "feeling of not being enough", "worthless" → "worthlessness"
+
+The statements should acknowledge the deeper issue while maintaining self-acceptance.`;
+        
+        const deepeningToolMessages = [
+          { role: 'system', content: deepeningToolPrompt },
+          { role: 'user', content: `Generate setup statements for: ${updatedFeeling} about ${updatedProblem}, felt in ${bodyLocation}` }
+        ];
+        
+        const toolResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: deepeningToolMessages,
+            tools: [generateTappingDirectiveTool],
+            tool_choice: { type: "function", function: { name: "generate_tapping_directive" } },
+            temperature: 0.7,
+            max_tokens: 600,
+          }),
+        });
+        
+        const toolData = await toolResponse.json();
+        
+        if (!toolResponse.ok) {
+          throw new Error(toolData.error?.message || 'OpenAI API error (deepening tool calling)');
+        }
+        
+        const toolCall = toolData.choices[0].message.tool_calls?.[0];
+        
+        if (toolCall && toolCall.function.name === 'generate_tapping_directive') {
+          const toolArgs = JSON.parse(toolCall.function.arguments);
+          console.log('[eft-chat] Deepening tool call successful:', JSON.stringify(toolArgs));
+          
+          // Build the directive from tool output - transition to SETUP
+          extractedDirective = {
+            next_state: 'setup',
+            tapping_point: 0,
+            setup_statements: toolArgs.setup_statements,
+            statement_order: [0, 1, 2, 0, 1, 2, 1, 0],
+            say_index: 0,
+            collect: 'none'
+          };
+          
+          // SHORT visible response - no setup statements in chat!
+          aiResponse = `I see, ${capitalizedName} — this goes deeper. It's really about ${updatedFeeling !== previousFeeling ? `this ${updatedFeeling}` : updatedProblem}. Let's tap on this new layer.`;
+          aiResponse += `\n\n<<DIRECTIVE ${JSON.stringify(extractedDirective)}>>`;
+          
+          console.log('[eft-chat] ✅ Deepening complete - transitioning to setup');
+          console.log('[eft-chat] New statements:', toolArgs.setup_statements);
+        } else {
+          throw new Error('Deepening tool call did not return expected function');
+        }
+      } else {
+        // Still exploring - regular AI call with enforced directive
+        console.log('[eft-chat] Still exploring deeper - continuing conversation-deepening');
+        
+        const messages = [
+          { role: 'system', content: systemPrompt + `
+
+CRITICAL RULES:
+- Do NOT ask for intensity - we already have it
+- Do NOT print setup statements in your response
+- Ask ONE probing question to find what's underneath
+- Be warm and curious
+
+DIRECTIVE (MANDATORY - end every response with this):
+<<DIRECTIVE {"next_state":"conversation-deepening","collect":"conversation"}>>
+` },
+          ...conversationHistory.slice(-20).map((msg: any) => ({
+            role: msg.type === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          })),
+          { role: 'user', content: sanitizedMessage }
+        ];
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages,
+            temperature: 0.7,
+            max_tokens: 400,
+          }),
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error?.message || 'OpenAI API error');
+        }
+
+        aiResponse = data.choices[0].message.content;
+        
+        // ENFORCE DIRECTIVE: If AI forgot, append it
+        if (!aiResponse.includes('<<DIRECTIVE')) {
+          console.warn('[eft-chat] AI forgot directive in deepening - appending fallback');
+          aiResponse += `\n\n<<DIRECTIVE {"next_state":"conversation-deepening","collect":"conversation"}>>`;
+        }
       }
     } else {
       // Regular API call for all other states
