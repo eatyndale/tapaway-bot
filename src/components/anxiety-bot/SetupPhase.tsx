@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
-import karateChopImg from "@/assets/tapping/karate-chop.png";
+import karateChopImg from "@/assets/tapping/karate-chop.gif";
 
 interface SetupPhaseProps {
   setupStatements: string[];
@@ -125,13 +125,16 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
           </div>
         </div>
 
-        {/* Current Statement with fade transition */}
+        {/* Current Statement with fade transition - key forces re-animation */}
         <div className="text-center space-y-4">
-          <div className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20 transition-all duration-300">
+          <div 
+            key={currentStatement} 
+            className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20 transition-all duration-300 animate-fade-in"
+          >
             <p className="text-sm font-medium text-muted-foreground mb-2">
               Repeat while tapping:
             </p>
-            <p className="text-lg font-semibold text-foreground leading-relaxed animate-fade-in">
+            <p className="text-lg font-semibold text-foreground leading-relaxed">
               "{currentStatementText}"
             </p>
           </div>
