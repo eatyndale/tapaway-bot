@@ -191,6 +191,13 @@ const TappingGuide = ({
     if (currentPoint < tappingPoints.length - 1) {
       setCurrentPoint(prev => prev + 1);
       setTimeRemaining(15);
+      // Auto-start playing when moving to next point
+      setIsPlaying(true);
+      if (audioRef.current) {
+        audioRef.current.play().catch((err) => {
+          console.error('[TappingGuide] Audio play failed:', err);
+        });
+      }
     } else {
       setIsPlaying(false);
       if (audioRef.current) {
