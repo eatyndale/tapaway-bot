@@ -18,8 +18,8 @@ export const WhatIsTapaway = () => {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 mt-12">
-            <div className="glass rounded-2xl p-8 hover-lift transition-all duration-300">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 text-primary mb-6">
+            <div className="bg-primary/10 border border-primary/20 rounded-2xl p-8 hover-lift transition-all duration-300">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/20 text-primary mb-6">
                 <Sparkles className="w-7 h-7" />
               </div>
               <h3 className="text-xl font-heading font-semibold text-foreground mb-3">
@@ -32,8 +32,8 @@ export const WhatIsTapaway = () => {
               </p>
             </div>
 
-            <div className="glass rounded-2xl p-8 hover-lift transition-all duration-300">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-accent/10 text-accent-foreground mb-6">
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-8 hover-lift transition-all duration-300">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-orange-100 text-orange-600 mb-6">
                 <Heart className="w-7 h-7" />
               </div>
               <h3 className="text-xl font-heading font-semibold text-foreground mb-3">
