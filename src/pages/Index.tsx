@@ -1,75 +1,71 @@
-
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { supabaseService } from "@/services/supabaseService";
-import type { User, Session } from '@supabase/supabase-js';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Heart, Brain, Users, Shield } from "lucide-react";
 import AuthForm from "@/components/AuthForm";
 import Dashboard from "@/components/Dashboard";
+import { supabaseService } from "@/services/supabaseService";
+import { supabase } from "@/integrations/supabase/client";
+import type { User, Session } from "@supabase/supabase-js";
+import { ArrowRight, MessageCircle, Hand, CheckCircle } from "lucide-react";
+import { ScienceSection } from "@/components/landing/ScienceSection";
+import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
+import { WhatIsTapaway } from "@/components/landing/WhatIsTapaway";
+import { BenefitsSection } from "@/components/landing/BenefitsSection";
 
 const Index = () => {
+  const [showAuth, setShowAuth] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [showAuth, setShowAuth] = useState(false);
-  const [showAssessment, setShowAssessment] = useState(false);
-  const [requiresAuth, setRequiresAuth] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [pendingAction, setPendingAction] = useState<'assessment' | 'chat' | null>(null);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsLoading(false);
 
-    // THEN check for existing session
+      if (session?.user && pendingAction) {
+        setPendingAction(null);
+      }
+    });
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
-
-  const handleStartJourney = () => {
-    setShowAssessment(true);
-  };
+  }, [pendingAction]);
 
   const handleStartAssessment = () => {
     if (!user) {
-      setRequiresAuth(true);
+      setPendingAction('assessment');
       setShowAuth(true);
     }
-    // If user is authenticated, Dashboard component will handle assessment
-  };
-
-  const handleAuthSuccess = () => {
-    setShowAuth(false);
-    setRequiresAuth(false);
   };
 
   const handleProceedToChat = () => {
     if (!user) {
-      setRequiresAuth(true);
+      setPendingAction('chat');
       setShowAuth(true);
     }
-    // If user is authenticated, Dashboard component will handle chat
+  };
+
+  const handleAuthSuccess = () => {
+    setShowAuth(false);
   };
 
   const handleSignOut = async () => {
     await supabaseService.signOut();
+    setUser(null);
+    setSession(null);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-soft">
+        <div className="animate-pulse text-primary">Loading...</div>
       </div>
     );
   }
@@ -79,183 +75,193 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
-      {showAuth ? (
-        <AuthForm 
-          onSuccess={handleAuthSuccess} 
-          onBack={() => {
-            setShowAuth(false);
-            setRequiresAuth(false);
-            setShowAssessment(false);
-          }}
-          message={requiresAuth ? "Please sign in to continue with your assessment" : undefined}
-        />
-      ) : showAssessment ? (
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-2xl mx-auto text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-6">Ready to Begin?</h1>
-            <p className="text-lg text-gray-600 mb-8">
-              Choose how you'd like to start your wellness journey
-            </p>
-            
-            <div className="grid gap-6 mb-8">
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleStartAssessment}>
-                <CardHeader>
-                  <CardTitle>Take Assessment First</CardTitle>
-                  <CardDescription>
-                    Complete a brief questionnaire to help us understand your wellness needs and provide personalized support
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button className="w-full bg-[#4dbad1] hover:bg-[#3da3ba] text-white">
-                    Start Assessment
-                  </Button>
-                </CardContent>
-              </Card>
-              
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleProceedToChat}>
-                <CardHeader>
-                  <CardTitle>Go Directly to Chat</CardTitle>
-                  <CardDescription>
-                    Skip the assessment and start working with our wellness bot right away
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="outline" className="w-full border-[#4dbad1] text-[#4dbad1] hover:bg-[#4dbad1]/10">
-                    Start Chatting
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-            
-            <Button variant="ghost" onClick={() => setShowAssessment(false)}>
-              Back to Home
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="container mx-auto px-4 py-8">
-          {/* Hero Section */}
-          <div className="text-center mb-16 animate-fade-in">
+    <div className="min-h-screen bg-background">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+        <div className="container mx-auto px-4 py-20 md:py-32 relative">
+          <div className="max-w-4xl mx-auto text-center">
             <div className="flex justify-center mb-6">
               <img 
                 src="/lovable-uploads/2323e4a7-8630-4879-88a4-0b0c0be5aba7.png" 
                 alt="Tapaway" 
-                className="h-16"
+                className="h-14"
               />
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-              Find Your
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4dbad1] to-[#3da3ba]"> Inner Peace</span>
+            
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-6">
+              <Hand className="w-4 h-4" />
+              <span className="text-sm font-medium">AI-Guided EFT Tapping</span>
+            </div>
+            
+            <h1 className="text-4xl md:text-6xl font-heading font-bold text-foreground mb-6 leading-tight">
+              Instant Emotional Relief.{" "}
+              <span className="text-primary">Anytime. Anywhere.</span>
             </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-              Your personal wellness companion using proven techniques to help you find calm and clarity in the workplace.
+            
+            <p className="text-xl text-muted-foreground mb-4 max-w-2xl mx-auto">
+              Real-Time Support for Real-Life Stress
             </p>
+            
+            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
+              Tapaway puts personalised, AI-guided tapping support in your hands—whenever you need it. 
+              No waiting rooms. No referrals. Just fast relief that works.
+            </p>
+            
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
-                onClick={handleStartJourney}
                 size="lg" 
-                className="bg-[#4dbad1] hover:bg-[#3da3ba] text-white px-8 py-3 rounded-full transition-all duration-300 hover:scale-105"
+                onClick={handleProceedToChat}
+                className="text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl transition-all"
               >
-                Start Your Journey
+                Start Tapping Now
+                <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
               <Button 
-                variant="outline" 
-                size="lg"
-                className="border-2 border-gray-300 hover:border-[#4dbad1] px-8 py-3 rounded-full transition-all duration-300"
+                size="lg" 
+                variant="outline"
+                onClick={handleStartAssessment}
+                className="text-lg px-8 py-6 rounded-full"
               >
-                Learn More
+                Take Assessment First
               </Button>
             </div>
           </div>
+        </div>
+        
+        {/* Wave Divider */}
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
+            <path 
+              d="M0 120L60 105C120 90 240 60 360 45C480 30 600 30 720 37.5C840 45 960 60 1080 67.5C1200 75 1320 75 1380 75L1440 75V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" 
+              className="fill-background"
+            />
+          </svg>
+        </div>
+      </section>
 
-          {/* Features Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-            {[
-              {
-                icon: Brain,
-                title: "Science-Based",
-                description: "Built on proven wellness techniques and psychological research"
-              },
-              {
-                icon: Heart,
-                title: "Personalized",
-                description: "Tailored approach based on your specific wellness patterns"
-              },
-              {
-                icon: Shield,
-                title: "Safe & Secure",
-                description: "Your wellness data is protected with enterprise-grade security"
-              },
-              {
-                icon: Users,
-                title: "Professional Support",
-                description: "Crisis intervention and professional referrals when needed"
-              }
-            ].map((feature, index) => (
-              <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-white/70 backdrop-blur-sm">
-                <CardHeader className="text-center pb-2">
-                  <div className="w-12 h-12 bg-[#4dbad1] rounded-full flex items-center justify-center mx-auto mb-4">
-                    <feature.icon className="w-6 h-6 text-white" />
-                  </div>
-                  <CardTitle className="text-lg font-semibold text-gray-900">{feature.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-center text-gray-600 leading-relaxed">
-                    {feature.description}
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            ))}
+      {/* Benefits Section */}
+      <BenefitsSection />
+
+      {/* Science Section */}
+      <ScienceSection />
+
+      {/* What is Tapaway Section */}
+      <WhatIsTapaway />
+
+      {/* How It Works Section */}
+      <section className="py-20 bg-muted/20">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-heading font-bold text-foreground mb-4">
+              How It Works
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Three simple steps to feeling better—no experience needed.
+            </p>
           </div>
 
-          {/* How It Works */}
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-8">How It Works</h2>
-            <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-              {[
-                {
-                  step: "1",
-                  title: "Complete Assessment",
-                  description: "Answer a few questions to help us understand your wellness patterns"
-                },
-                {
-                  step: "2",
-                  title: "Identify Triggers",
-                  description: "Work with our bot to pinpoint what's causing your stress"
-                },
-                {
-                  step: "3",
-                  title: "Guided Sessions",
-                  description: "Follow personalized wellness sequences to reduce stress and anxiety"
-                }
-              ].map((item, index) => (
-                <div key={index} className="relative">
-                  <div className="w-12 h-12 bg-[#4dbad1] rounded-full flex items-center justify-center mx-auto mb-4 text-white font-bold text-lg">
-                    {item.step}
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{item.title}</h3>
-                  <p className="text-gray-600 leading-relaxed">{item.description}</p>
-                  {index < 2 && (
-                    <div className="hidden md:block absolute top-6 left-full w-full h-0.5 bg-[#4dbad1]/30 transform -translate-y-1/2"></div>
-                  )}
-                </div>
-              ))}
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+                1
+              </div>
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
+                <MessageCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-heading font-semibold text-foreground mb-3">
+                Share What's Bothering You
+              </h3>
+              <p className="text-muted-foreground">
+                Tell us what you're feeling—no judgment, no waiting. Our AI understands and responds with empathy.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+                2
+              </div>
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
+                <Hand className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-heading font-semibold text-foreground mb-3">
+                Follow Guided Tapping
+              </h3>
+              <p className="text-muted-foreground">
+                Our AI guides you through personalised EFT sequences, showing you exactly where and how to tap.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+                3
+              </div>
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
+                <CheckCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-heading font-semibold text-foreground mb-3">
+                Feel the Relief
+              </h3>
+              <p className="text-muted-foreground">
+                Experience measurable reduction in stress and anxiety. Most users feel calmer within minutes.
+              </p>
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* CTA Section */}
-          <div className="text-center bg-[#4dbad1] rounded-2xl p-12 text-white">
-            <h2 className="text-3xl font-bold mb-4">Ready to Start Feeling Better?</h2>
-            <p className="text-xl mb-8 opacity-90">Join thousands who have found relief through our wellness program.</p>
-            <Button 
-              onClick={handleStartJourney}
-              size="lg" 
-              variant="secondary"
-              className="bg-white text-[#4dbad1] hover:bg-gray-100 px-8 py-3 rounded-full transition-all duration-300 hover:scale-105"
-            >
-              Get Started Now
-            </Button>
+      {/* Testimonials Section */}
+      <TestimonialsSection />
+
+      {/* CTA Section */}
+      <section className="py-20 bg-gradient-to-br from-primary/10 via-background to-accent/10">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-heading font-bold text-foreground mb-4">
+            Your Journey to Emotional Freedom Starts Here
+          </h2>
+          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+            Join thousands who have found relief through EFT tapping. No apps to download, 
+            no waiting lists—just instant support when you need it.
+          </p>
+          <Button 
+            size="lg" 
+            onClick={handleProceedToChat}
+            className="text-lg px-10 py-6 rounded-full shadow-lg hover:shadow-xl transition-all"
+          >
+            Start Your Free Session
+            <ArrowRight className="ml-2 w-5 h-5" />
+          </Button>
+        </div>
+      </section>
+
+      {/* Auth Modal */}
+      {showAuth && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-heading font-bold text-foreground">
+                  {pendingAction === 'assessment' ? 'Sign in to Start Assessment' : 'Sign in to Start Tapping'}
+                </h2>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setShowAuth(false);
+                    setPendingAction(null);
+                  }}
+                >
+                  ✕
+                </Button>
+              </div>
+              <AuthForm 
+                onSuccess={handleAuthSuccess} 
+                onBack={() => {
+                  setShowAuth(false);
+                  setPendingAction(null);
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
