@@ -150,7 +150,7 @@ const Index = () => {
       <WhatIsTapaway />
 
       {/* How It Works Section */}
-      <section className="py-20 bg-muted/20">
+      <section className="py-20 bg-gradient-to-b from-orange-50/50 to-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-heading font-bold text-foreground mb-4">
@@ -162,8 +162,8 @@ const Index = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+            <div className="text-center bg-card rounded-2xl p-8 shadow-soft">
+              <div className="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center mx-auto mb-6 text-2xl font-bold shadow-lg">
                 1
               </div>
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
@@ -177,8 +177,8 @@ const Index = () => {
               </p>
             </div>
 
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+            <div className="text-center bg-card rounded-2xl p-8 shadow-soft">
+              <div className="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center mx-auto mb-6 text-2xl font-bold shadow-lg">
                 2
               </div>
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
@@ -192,8 +192,8 @@ const Index = () => {
               </p>
             </div>
 
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+            <div className="text-center bg-card rounded-2xl p-8 shadow-soft">
+              <div className="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center mx-auto mb-6 text-2xl font-bold shadow-lg">
                 3
               </div>
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
