@@ -125,26 +125,25 @@ export function useHeyGenAvatar({ videoRef }: UseHeyGenAvatarOptions): UseHeyGen
     setError(null);
     
     try {
-      console.log('[useHeyGenAvatar] Creating session via edge function...');
+      console.log('[useHeyGenAvatar] Getting token via edge function...');
       
-      // Get session token from edge function
+      // Get access token from edge function
       const { data, error: fnError } = await supabase.functions.invoke('heygen-session', {
-        body: { action: 'create' },
+        body: { action: 'create_token' },
       });
       
       if (fnError) {
-        throw new Error(fnError.message || 'Failed to create session');
+        throw new Error(fnError.message || 'Failed to get token');
       }
       
-      if (!data?.sessionId || !data?.accessToken) {
-        throw new Error('Invalid session response');
+      if (!data?.token) {
+        throw new Error('Invalid token response');
       }
       
-      sessionIdRef.current = data.sessionId;
-      console.log('[useHeyGenAvatar] Session created:', data.sessionId);
+      console.log('[useHeyGenAvatar] Token received, initializing SDK...');
       
-      // Initialize StreamingAvatar SDK
-      const avatar = new StreamingAvatar({ token: data.accessToken });
+      // Initialize StreamingAvatar SDK with the token
+      const avatar = new StreamingAvatar({ token: data.token });
       avatarRef.current = avatar;
       
       // Set up event handlers
@@ -170,11 +169,14 @@ export function useHeyGenAvatar({ videoRef }: UseHeyGenAvatarOptions): UseHeyGen
         sessionIdRef.current = null;
       });
       
-      // Start the avatar session
-      await avatar.createStartAvatar({
+      // Start the avatar session - SDK handles everything internally
+      const sessionInfo = await avatar.createStartAvatar({
         quality: AvatarQuality.Medium,
-        avatarName: data.avatarId || 'Anna_public_3_20240108',
+        avatarName: 'Anna_public_3_20240108',
       });
+      
+      sessionIdRef.current = sessionInfo?.session_id || null;
+      console.log('[useHeyGenAvatar] Avatar session started:', sessionIdRef.current);
       
     } catch (e) {
       console.error('[useHeyGenAvatar] Connection error:', e);
