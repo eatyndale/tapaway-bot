@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { RotateCcw, Sparkles } from "lucide-react";
 import { QuestionnaireSession } from "./types";
+import AvatarToggle from "./AvatarToggle";
+import { useAvatarOptional } from "@/contexts/AvatarContext";
 
 interface ChatHeaderProps {
   questionnaireSession: QuestionnaireSession | null;
@@ -17,6 +19,9 @@ const ChatHeader = ({
   onToggleHistory, 
   onStartNewSession 
 }: ChatHeaderProps) => {
+  // Avatar context is optional - may not be wrapped in provider
+  const avatarContext = useAvatarOptional();
+  
   return (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
       <div className="flex items-center gap-4">
@@ -42,14 +47,19 @@ const ChatHeader = ({
         </div>
       </div>
       
-      <Button 
-        variant="outline" 
-        onClick={onStartNewSession}
-        size="sm"
-      >
-        <RotateCcw className="w-4 h-4 mr-2" />
-        New Session
-      </Button>
+      <div className="flex items-center gap-3">
+        {/* Avatar Toggle - only show if context is available */}
+        {avatarContext && <AvatarToggle />}
+        
+        <Button 
+          variant="outline" 
+          onClick={onStartNewSession}
+          size="sm"
+        >
+          <RotateCcw className="w-4 h-4 mr-2" />
+          New Session
+        </Button>
+      </div>
     </div>
   );
 };
