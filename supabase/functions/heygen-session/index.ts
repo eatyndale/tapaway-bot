@@ -7,15 +7,9 @@ const corsHeaders = {
 
 const HEYGEN_API_BASE = "https://api.heygen.com/v1";
 
-// Default avatar ID - calm, professional avatar suitable for therapy sessions
-const DEFAULT_AVATAR_ID = "Anna_public_3_20240108";
-const DEFAULT_VOICE_ID = "1bd001e7e50f421d891986aad5158bc8"; // Soft, calm voice
-
-interface CreateSessionRequest {
-  action: "create" | "close";
+interface SessionRequest {
+  action: "create_token" | "close";
   sessionId?: string;
-  avatarId?: string;
-  voiceId?: string;
 }
 
 serve(async (req) => {
@@ -34,33 +28,26 @@ serve(async (req) => {
   }
 
   try {
-    const body: CreateSessionRequest = await req.json();
-    const { action, sessionId, avatarId, voiceId } = body;
+    const body: SessionRequest = await req.json();
+    const { action, sessionId } = body;
 
-    if (action === "create") {
-      // Create a new streaming avatar session
-      console.log("[heygen-session] Creating new session");
+    if (action === "create_token" || action === "create") {
+      // Generate an access token for the SDK to use
+      // The SDK will handle session creation internally
+      console.log("[heygen-session] Generating access token for SDK");
       
-      const response = await fetch(`${HEYGEN_API_BASE}/streaming.new`, {
+      const response = await fetch(`${HEYGEN_API_BASE}/streaming.create_token`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Api-Key": HEYGEN_API_KEY,
         },
-        body: JSON.stringify({
-          avatar_id: avatarId || DEFAULT_AVATAR_ID,
-          voice: {
-            voice_id: voiceId || DEFAULT_VOICE_ID,
-          },
-          quality: "medium", // Balance quality and latency
-        }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error("[heygen-session] HeyGen API error:", response.status, errorText);
         
-        // Check for specific errors
         if (response.status === 401) {
           return new Response(
             JSON.stringify({ error: "Invalid HeyGen API key" }),
@@ -76,21 +63,18 @@ serve(async (req) => {
         }
         
         return new Response(
-          JSON.stringify({ error: "Failed to create HeyGen session", details: errorText }),
+          JSON.stringify({ error: "Failed to create HeyGen token", details: errorText }),
           { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       const data = await response.json();
-      console.log("[heygen-session] Session created successfully:", data.data?.session_id);
+      console.log("[heygen-session] Token created successfully");
       
-      // Return session details needed for WebRTC connection
+      // Return the token for the SDK to use
       return new Response(
         JSON.stringify({
-          sessionId: data.data?.session_id,
-          accessToken: data.data?.access_token,
-          url: data.data?.url,
-          iceServers: data.data?.ice_servers || [],
+          token: data.data?.token,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -124,7 +108,7 @@ serve(async (req) => {
       
     } else {
       return new Response(
-        JSON.stringify({ error: "Invalid action. Use 'create' or 'close'" }),
+        JSON.stringify({ error: "Invalid action. Use 'create_token' or 'close'" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
