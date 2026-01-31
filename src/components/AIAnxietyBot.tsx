@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAIChat } from "@/hooks/useAIChat";
@@ -23,9 +23,12 @@ import ChatHeader from "./anxiety-bot/ChatHeader";
 import QuestionnaireView from "./anxiety-bot/QuestionnaireView";
 import AdviceDisplay from "./anxiety-bot/AdviceDisplay";
 import SessionComplete from "./anxiety-bot/SessionComplete";
+import StreamingAvatar from "./anxiety-bot/StreamingAvatar";
+import { AvatarProvider, useAvatarOptional } from "@/contexts/AvatarContext";
 
 
-const AIAnxietyBot = () => {
+// Inner component that uses avatar context
+const AIAnxietyBotInner = () => {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -75,6 +78,18 @@ const AIAnxietyBot = () => {
     }
   });
 
+  // Avatar context for speaking bot messages
+  const avatarContext = useAvatarOptional();
+  
+  // Callback to speak bot messages via avatar when enabled
+  const handleBotMessage = useCallback((text: string) => {
+    if (avatarContext?.avatarEnabled && avatarContext.status === 'connected') {
+      avatarContext.speak(text).catch(e => 
+        console.error('[AIAnxietyBot] Avatar speech failed:', e)
+      );
+    }
+  }, [avatarContext]);
+
   // Auto-scroll to bottom when messages change
   const scrollToBottom = () => {
     if (scrollContainerRef.current) {
@@ -86,6 +101,14 @@ const AIAnxietyBot = () => {
     const timeoutId = setTimeout(scrollToBottom, 100);
     return () => clearTimeout(timeoutId);
   }, [messages, isLoading]);
+  
+  // Speak the latest bot message when it arrives
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.type === 'bot' && !isLoading) {
+      handleBotMessage(lastMessage.content);
+    }
+  }, [messages, isLoading, handleBotMessage]);
 
   useEffect(() => {
     loadChatHistory();
@@ -395,8 +418,11 @@ const AIAnxietyBot = () => {
     );
   }
 
+  // Check if avatar is enabled for layout
+  const isAvatarEnabled = avatarContext?.avatarEnabled && avatarContext.status !== 'idle';
+
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <ChatHeader 
         questionnaireSession={questionnaireSession}
         chatState={chatState}
@@ -405,9 +431,23 @@ const AIAnxietyBot = () => {
         onStartNewSession={startNewSession}
       />
 
-      <div className="grid lg:grid-cols-4 gap-6">
+      <div className={`grid gap-6 ${isAvatarEnabled ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        {/* Avatar Panel - only show when enabled */}
+        {isAvatarEnabled && (
+          <div className="lg:col-span-1 order-first lg:order-last">
+            <Card className="sticky top-4">
+              <CardContent className="p-4 flex flex-col items-center">
+                <StreamingAvatar size="medium" />
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  AI Avatar
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+        
         {/* Chat Interface */}
-        <div className="lg:col-span-3">
+        <div className={isAvatarEnabled ? 'lg:col-span-3' : 'lg:col-span-3'}>
           <Card className="border-0 shadow-elevated bg-gradient-to-b from-card to-card/95 backdrop-blur-sm overflow-hidden">
             {/* Premium Header */}
             <CardHeader className="border-b border-border/30 bg-gradient-to-r from-primary/5 to-transparent pb-4">
@@ -579,6 +619,15 @@ const AIAnxietyBot = () => {
         <CrisisSupport onClose={() => setShowCrisisSupport(false)} />
       )}
     </div>
+  );
+};
+
+// Wrapper component that provides avatar context
+const AIAnxietyBot = () => {
+  return (
+    <AvatarProvider>
+      <AIAnxietyBotInner />
+    </AvatarProvider>
   );
 };
 
