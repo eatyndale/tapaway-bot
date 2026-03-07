@@ -319,10 +319,15 @@ export type Database = {
           improvement: number | null
           industry: string | null
           initial_intensity: number
+          is_tearless_trauma: boolean | null
+          peak_suds: number | null
           problem: string
+          quiet_integration_used: boolean | null
           reminder_phrases: string[] | null
           rounds_completed: number | null
+          session_type: string | null
           setup_statements: string[] | null
+          support_contacted: boolean | null
           updated_at: string
           user_id: string
         }
@@ -337,10 +342,15 @@ export type Database = {
           improvement?: number | null
           industry?: string | null
           initial_intensity: number
+          is_tearless_trauma?: boolean | null
+          peak_suds?: number | null
           problem: string
+          quiet_integration_used?: boolean | null
           reminder_phrases?: string[] | null
           rounds_completed?: number | null
+          session_type?: string | null
           setup_statements?: string[] | null
+          support_contacted?: boolean | null
           updated_at?: string
           user_id: string
         }
@@ -355,10 +365,15 @@ export type Database = {
           improvement?: number | null
           industry?: string | null
           initial_intensity?: number
+          is_tearless_trauma?: boolean | null
+          peak_suds?: number | null
           problem?: string
+          quiet_integration_used?: boolean | null
           reminder_phrases?: string[] | null
           rounds_completed?: number | null
+          session_type?: string | null
           setup_statements?: string[] | null
+          support_contacted?: boolean | null
           updated_at?: string
           user_id?: string
         }
