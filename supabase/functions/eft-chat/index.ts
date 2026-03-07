@@ -1101,6 +1101,15 @@ ${hitStrikeLimit ? `
 - Suggest alternative approaches or professional support
 `}
 
+${isTTTSession ? `
+**SPECIAL CONTEXT: Tearless Trauma Therapy Session**
+- This was a high-distress session where we used gentle, non-probing tapping
+- Do NOT ask what the issue was — they chose not to share and that's perfectly valid
+- Focus on what they accomplished: showing up, doing the work, being brave
+- Suggest professional support as a positive next step, not a failure
+- Emphasize that some things need time and multiple sessions
+` : ''}
+
 **Example of correct format:**
 
 ${capitalizedName}, that ${feelingWord} you were holding in your ${bodyLoc} is real and valid. [Continue with personalized reflection on their experience with ${problemDesc}...]
