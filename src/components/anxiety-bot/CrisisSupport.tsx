@@ -6,9 +6,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CrisisSupportProps {
   onClose?: () => void;
+  onSupportContacted?: () => void;
 }
 
-const CrisisSupport = ({ onClose }: CrisisSupportProps) => {
+const CrisisSupport = ({ onClose, onSupportContacted }: CrisisSupportProps) => {
   const [callInitiated, setCallInitiated] = useState<string | null>(null);
 
   const emergencyContacts = [
