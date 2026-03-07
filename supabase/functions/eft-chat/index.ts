@@ -748,6 +748,16 @@ CURRENT STAGE GUIDANCE:`;
     console.log('[eft-chat] Current tapping point:', currentTappingPoint);
 
     switch (chatState) {
+      case 'greeting-intensity':
+        // This state is mostly handled by frontend (handleGreetingIntensity)
+        // But if AI is called, just acknowledge
+        systemPrompt += `
+**CURRENT STATE: greeting-intensity**
+The user is rating their initial intensity. Just acknowledge warmly.
+<<DIRECTIVE {"next_state":"greeting-intensity","collect":"intensity"}>>
+`;
+        break;
+        
       case 'conversation':
         const gatheredInfo = {
           hasProblem: !!sessionContext.problem,
@@ -1031,6 +1041,8 @@ Note: The frontend will decide whether to continue tapping, offer a choice, or m
         const totalRoundsNoReduction = sessionContext.totalRoundsWithoutReduction || 0;
         const deepeningCount = sessionContext.deepeningAttempts || 0;
         const hitStrikeLimit = totalRoundsNoReduction >= 3;
+        const isTTTSession = sessionContext.isTearlessTrauma === true;
+        const sessionTypeDesc = sessionContext.sessionType || 'traditional';
         
         systemPrompt += `
 **CURRENT STATE: advice**
@@ -1088,6 +1100,15 @@ ${hitStrikeLimit ? `
 - Be encouraging without minimizing their experience
 - Suggest alternative approaches or professional support
 `}
+
+${isTTTSession ? `
+**SPECIAL CONTEXT: Tearless Trauma Therapy Session**
+- This was a high-distress session where we used gentle, non-probing tapping
+- Do NOT ask what the issue was — they chose not to share and that's perfectly valid
+- Focus on what they accomplished: showing up, doing the work, being brave
+- Suggest professional support as a positive next step, not a failure
+- Emphasize that some things need time and multiple sessions
+` : ''}
 
 **Example of correct format:**
 

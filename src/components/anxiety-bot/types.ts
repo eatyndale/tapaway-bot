@@ -1,6 +1,21 @@
-export type ChatState = 'questionnaire' | 'conversation' | 'conversation-deepening' | 'gathering-intensity' | 'setup' | 'tapping-point' | 'tapping-breathing' | 'post-tapping' | 'advice' | 'complete';
+export type ChatState = 
+  | 'questionnaire' 
+  | 'greeting-intensity'
+  | 'conversation' 
+  | 'conversation-deepening' 
+  | 'gathering-intensity' 
+  | 'tearless-setup'
+  | 'setup' 
+  | 'tapping-point' 
+  | 'tapping-breathing' 
+  | 'post-tapping' 
+  | 'quiet-integration'
+  | 'advice' 
+  | 'complete';
 
 export type ReminderPhraseType = 'acknowledging' | 'partial-release' | 'full-release';
+export type SessionType = 'traditional' | 'tearless' | 'mixed';
+
 export interface QuestionnaireResponse {
   question: number;
   answer: number; // 0-3 scale
@@ -32,6 +47,13 @@ export interface ChatSession {
   isDeepening?: boolean;
   deepeningAttempts?: number;
   totalRoundsWithoutReduction?: number;
+  // New fields for revised logic
+  isTearlessTrauma?: boolean;
+  peakSuds?: number;
+  supportContacted?: boolean;
+  quietIntegrationUsed?: boolean;
+  sessionType?: SessionType;
+  highSudsRounds?: number; // Tracks consecutive rounds at SUDS 8-10
 }
 
 export interface Message {

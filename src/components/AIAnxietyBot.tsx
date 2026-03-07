@@ -16,13 +16,13 @@ import PostTappingChoice from "./anxiety-bot/PostTappingChoice";
 import CrisisSupport from "./anxiety-bot/CrisisSupport";
 import ChatMessage from "./anxiety-bot/ChatMessage";
 import LoadingIndicator from "./anxiety-bot/LoadingIndicator";
-import SetupStatements from "./anxiety-bot/SetupStatements";
 import ChatInput from "./anxiety-bot/ChatInput";
-import SessionActions from "./anxiety-bot/SessionActions";
 import ChatHeader from "./anxiety-bot/ChatHeader";
 import QuestionnaireView from "./anxiety-bot/QuestionnaireView";
 import AdviceDisplay from "./anxiety-bot/AdviceDisplay";
 import SessionComplete from "./anxiety-bot/SessionComplete";
+import GreetingIntensity from "./anxiety-bot/GreetingIntensity";
+import QuietIntegration from "./anxiety-bot/QuietIntegration";
 
 
 const AIAnxietyBot = () => {
@@ -32,7 +32,7 @@ const AIAnxietyBot = () => {
   
   const [chatState, setChatState] = useState<ChatState>(() => {
     const hasCompletedAssessment = localStorage.getItem('hasCompletedAssessment');
-    return hasCompletedAssessment ? 'conversation' : 'questionnaire';
+    return hasCompletedAssessment ? 'greeting-intensity' : 'questionnaire';
   });
   const [currentInput, setCurrentInput] = useState("");
   const [currentIntensity, setCurrentIntensity] = useState([5]);
@@ -57,25 +57,24 @@ const AIAnxietyBot = () => {
     startNewTappingRound,
     handlePostTappingIntensity,
     completeTappingSession,
-    handleTalkToTapaway
+    handleTalkToTapaway,
+    handleGreetingIntensity,
+    handleQuietIntegrationComplete,
+    handleSupportContacted
   } = useAIChat({
     onStateChange: (newState) => {
       console.log('State change:', chatState, '->', newState);
       setChatState(newState);
     },
-    onSessionUpdate: (context) => {
-      // Update local state based on AI conversation
-    },
+    onSessionUpdate: (context) => {},
     onCrisisDetected: () => {
       setShowCrisisSupport(true);
     },
     onTypoCorrection: (original, corrected) => {
-      // Silently apply corrections - no toast notification
       console.log('[AIAnxietyBot] Typo corrected:', original, '->', corrected);
     }
   });
 
-  // Auto-scroll to bottom when messages change
   const scrollToBottom = () => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
@@ -92,9 +91,7 @@ const AIAnxietyBot = () => {
   }, []);
 
   useEffect(() => {
-    if (showHistory) {
-      loadChatHistory();
-    }
+    if (showHistory) loadChatHistory();
   }, [showHistory]);
 
   const loadChatHistory = async () => {
@@ -112,7 +109,7 @@ const AIAnxietyBot = () => {
   const handleQuestionnaireComplete = (session: QuestionnaireSession) => {
     setQuestionnaireSession(session);
     localStorage.setItem('hasCompletedAssessment', 'true');
-    setChatState('conversation');
+    setChatState('greeting-intensity');
     toast({
       title: "Assessment Complete",
       description: `Your anxiety level: ${session.severity} (Score: ${session.totalScore}/27)`,
@@ -120,7 +117,7 @@ const AIAnxietyBot = () => {
   };
 
   const handleSkipAssessment = () => {
-    setChatState('conversation');
+    setChatState('greeting-intensity');
     toast({
       title: "Assessment Skipped",
       description: "You can take the assessment later from the menu.",
@@ -130,10 +127,8 @@ const AIAnxietyBot = () => {
   const handleSubmit = async () => {
     if (!currentInput.trim() && !['gathering-intensity', 'post-tapping', 'tapping-breathing'].includes(chatState)) return;
 
-    // Special handling for tapping-breathing state - call handlePostTappingIntensity directly
     if (chatState === 'tapping-breathing') {
       const intensity = currentIntensity[0];
-      console.log('[AIAnxietyBot] Tapping-breathing intensity submitted:', intensity);
       await handlePostTappingIntensity(intensity);
       return;
     }
@@ -141,7 +136,6 @@ const AIAnxietyBot = () => {
     let messageToSend = currentInput;
     let additionalContext: any = {};
 
-    // Handle intensity submission
     if (chatState === 'gathering-intensity' || chatState === 'post-tapping') {
       messageToSend = `${currentIntensity[0]}/10`;
       if (chatState === 'gathering-intensity') {
@@ -151,9 +145,6 @@ const AIAnxietyBot = () => {
         additionalContext.currentIntensity = currentIntensity[0];
       }
     }
-
-    // Don't pre-populate additionalContext with raw input
-    // The edge function will extract clean values from the message
 
     await sendMessage(messageToSend, chatState, additionalContext);
     setCurrentInput("");
@@ -166,37 +157,15 @@ const AIAnxietyBot = () => {
     }
   };
 
-  const handleSetupStatementSelect = async (index: number) => {
-    setSelectedSetupStatement(index);
-    const statement = sessionContext.setupStatements?.[index] || "Selected setup statement";
-    await sendMessage(`I choose: "${statement}"`, 'tapping-point');
-    setChatState('tapping-point');
-    setIsTapping(true);
-    setCurrentTappingPoint(0);
-  };
-
-  const handleTappingComplete = () => {
-    setIsTapping(false);
-    // Don't set state here - let TappingGuide's onComplete handle transition to tapping-breathing
-  };
-
   const handleContinueTapping = async (intensity: number, phraseType?: 'acknowledging' | 'partial-release' | 'full-release') => {
-    console.log('[AIAnxietyBot] User chose to continue tapping');
     await startNewTappingRound(intensity, phraseType);
   };
 
   const handleEndSession = async () => {
-    console.log('[AIAnxietyBot] User chose to end session');
-    
-    // First, save tapping session data
     if (sessionContext.currentIntensity !== undefined) {
       await completeTappingSession(sessionContext.currentIntensity);
     }
-    
-    // Transition to advice state
     setChatState('advice');
-    
-    // Request advice from AI (with state='advice', won't be intercepted)
     await sendMessage(
       `I'm ready to finish. My final intensity is ${sessionContext.currentIntensity}/10. Initial was ${sessionContext.initialIntensity}/10.`,
       'advice',
@@ -204,29 +173,46 @@ const AIAnxietyBot = () => {
     );
   };
 
+  const handleQuietIntegration = () => {
+    setChatState('quiet-integration');
+  };
 
+  const handleContactSupport = () => {
+    setShowCrisisSupport(true);
+    handleSupportContacted();
+  };
 
   const renderInput = () => {
-    // Debug: log current state
-    console.log('Current chat state:', chatState);
-    
-    // Setup phase - karate chop with setup statements
+    // Greeting intensity - SUDS first
+    if (chatState === 'greeting-intensity') {
+      return (
+        <GreetingIntensity
+          userName={userProfile?.first_name || 'there'}
+          onSubmit={handleGreetingIntensity}
+          isLoading={isLoading}
+        />
+      );
+    }
+
+    // Quiet Integration
+    if (chatState === 'quiet-integration') {
+      return (
+        <QuietIntegration
+          onComplete={handleQuietIntegrationComplete}
+        />
+      );
+    }
+
+    // Setup phase
     if (chatState === 'setup') {
-      console.log('[AIAnxietyBot] 🎯 Rendering setup phase');
-      
       if (!sessionContext.setupStatements || sessionContext.setupStatements.length === 0) {
         return (
           <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg space-y-3">
-            <p className="text-sm font-semibold text-destructive mb-1">
-              ⚠️ Missing Setup Statements
-            </p>
-            <Button onClick={startNewSession} size="sm" variant="outline">
-              Start New Session
-            </Button>
+            <p className="text-sm font-semibold text-destructive mb-1">⚠️ Missing Setup Statements</p>
+            <Button onClick={startNewSession} size="sm" variant="outline">Start New Session</Button>
           </div>
         );
       }
-      
       return (
         <SetupPhase
           setupStatements={sessionContext.setupStatements}
@@ -235,23 +221,15 @@ const AIAnxietyBot = () => {
       );
     }
     
-    // Progressive tapping states with intensity sliders
+    // Intensity sliders
     if (chatState === 'gathering-intensity' || chatState === 'post-tapping') {
       return (
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Rate your intensity (0-10):
-            </label>
-            <IntensitySlider
-              value={currentIntensity}
-              onValueChange={setCurrentIntensity}
-              className="w-full"
-            />
+            <label className="text-sm font-medium">Rate your intensity (0-10):</label>
+            <IntensitySlider value={currentIntensity} onValueChange={setCurrentIntensity} className="w-full" />
             {intensityHistory.length > 0 && (
-              <div className="text-xs text-muted-foreground">
-                Previous ratings: {intensityHistory.join(' → ')}
-              </div>
+              <div className="text-xs text-muted-foreground">Previous ratings: {intensityHistory.join(' → ')}</div>
             )}
           </div>
           <Button onClick={handleSubmit} disabled={isLoading} className="w-full">
@@ -261,62 +239,31 @@ const AIAnxietyBot = () => {
       );
     }
 
-
-    // Progressive tapping point state - render TappingGuide
+    // Tapping point
     if (chatState === 'tapping-point') {
-      console.log('[AIAnxietyBot] 🎯 Rendering tapping-point state');
-      console.log('[AIAnxietyBot] Current tapping point:', currentTappingPoint);
-      console.log('[AIAnxietyBot] Setup statements:', sessionContext.setupStatements);
-      console.log('[AIAnxietyBot] Statement order:', sessionContext.statementOrder);
-      console.log('[AIAnxietyBot] Full session context:', sessionContext);
-      
-      // Safety check: ensure we have data
       if (!sessionContext.setupStatements || sessionContext.setupStatements.length === 0) {
         return (
           <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg space-y-3">
-            <div>
-              <p className="text-sm font-semibold text-destructive mb-1">
-                ⚠️ Missing Tapping Data
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Current state: <span className="font-mono">{chatState}</span> | Point: {currentTappingPoint}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                The AI didn't provide the required setup statements and statement order. This is likely a temporary issue.
-              </p>
-            </div>
+            <p className="text-sm font-semibold text-destructive mb-1">⚠️ Missing Tapping Data</p>
             <div className="flex gap-2">
-              <Button onClick={startNewSession} size="sm" variant="outline">
-                Start New Session
-              </Button>
-              <Button 
-                onClick={async () => {
-                  console.log('[AIAnxietyBot] User skipping tapping, moving to breathing');
-                  setChatState('tapping-breathing');
-                }} 
-                size="sm"
-              >
-                Skip to Breathing
-              </Button>
+              <Button onClick={startNewSession} size="sm" variant="outline">Start New Session</Button>
+              <Button onClick={() => setChatState('tapping-breathing')} size="sm">Skip to Breathing</Button>
             </div>
           </div>
         );
       }
-      
       return (
-        <div className="space-y-2">
-          <TappingGuide
-            setupStatements={sessionContext.setupStatements}
-            statementOrder={sessionContext.statementOrder || [0, 1, 2, 0, 1, 2, 0, 1]}
-            aiReminderPhrases={(sessionContext as any).aiReminderPhrases}
-            reminderPhraseType={sessionContext.reminderPhraseType || 'acknowledging'}
-            feeling={sessionContext.feeling || 'this feeling'}
-            bodyLocation={sessionContext.bodyLocation || 'body'}
-            problem={sessionContext.problem}
-            onComplete={() => setChatState('tapping-breathing')}
-            onPointChange={setCurrentTappingPoint}
-          />
-        </div>
+        <TappingGuide
+          setupStatements={sessionContext.setupStatements}
+          statementOrder={sessionContext.statementOrder || [0, 1, 2, 0, 1, 2, 0, 1]}
+          aiReminderPhrases={(sessionContext as any).aiReminderPhrases}
+          reminderPhraseType={sessionContext.reminderPhraseType || 'acknowledging'}
+          feeling={sessionContext.feeling || 'this feeling'}
+          bodyLocation={sessionContext.bodyLocation || 'body'}
+          problem={sessionContext.problem}
+          onComplete={() => setChatState('tapping-breathing')}
+          onPointChange={setCurrentTappingPoint}
+        />
       );
     }
 
@@ -325,18 +272,10 @@ const AIAnxietyBot = () => {
       return (
         <div className="space-y-4">
           <div className="text-center">
-            <div className="text-lg font-semibold mb-4">
-              Take a Deep Breath
-            </div>
+            <div className="text-lg font-semibold mb-4">Take a Deep Breath</div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                How are you feeling now? (0-10):
-              </label>
-              <IntensitySlider
-                value={currentIntensity}
-                onValueChange={setCurrentIntensity}
-                className="w-full"
-              />
+              <label className="text-sm font-medium">How are you feeling now? (0-10):</label>
+              <IntensitySlider value={currentIntensity} onValueChange={setCurrentIntensity} className="w-full" />
             </div>
           </div>
           <Button onClick={handleSubmit} disabled={isLoading} className="w-full">
@@ -346,13 +285,8 @@ const AIAnxietyBot = () => {
       );
     }
 
+    if (chatState === 'advice' || chatState === 'complete') return null;
 
-    // When advice or complete, hide input area - header buttons handle actions
-    if (chatState === 'advice' || chatState === 'complete') {
-      return null;
-    }
-
-    // Conversation-deepening uses same UI as conversation
     if (chatState === 'conversation' || chatState === 'conversation-deepening') {
       return (
         <ChatInput
@@ -406,10 +340,8 @@ const AIAnxietyBot = () => {
       />
 
       <div className="grid lg:grid-cols-4 gap-6">
-        {/* Chat Interface */}
         <div className="lg:col-span-3">
           <Card className="border-0 shadow-elevated bg-gradient-to-b from-card to-card/95 backdrop-blur-sm overflow-hidden">
-            {/* Premium Header */}
             <CardHeader className="border-b border-border/30 bg-gradient-to-r from-primary/5 to-transparent pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -422,7 +354,7 @@ const AIAnxietyBot = () => {
                       <Sparkles className="w-4 h-4 text-primary/60" />
                     </CardTitle>
                     <p className="text-xs text-muted-foreground">
-                      {sessionContext.problem || 'Ready to help you feel better'}
+                      {sessionContext.isTearlessTrauma ? 'Gentle tapping mode' : sessionContext.problem || 'Ready to help you feel better'}
                     </p>
                   </div>
                 </div>
@@ -433,19 +365,16 @@ const AIAnxietyBot = () => {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {/* Messages container with auto-scroll */}
               <div 
                 ref={scrollContainerRef}
                 className="h-[500px] overflow-y-auto px-6 py-4"
               >
                 <div className="space-y-4">
                   {messages.map((message, index) => {
-                    // Check if this is a choice message
                     if (message.type === 'system') {
                       try {
                         const parsed = JSON.parse(message.content);
                         
-                        // New post-tapping choice component
                         if (parsed.type === 'post-tapping-choice') {
                           return (
                             <PostTappingChoice
@@ -454,47 +383,33 @@ const AIAnxietyBot = () => {
                               initialIntensity={parsed.initialIntensity}
                               round={parsed.round}
                               roundsWithoutReduction={parsed.roundsWithoutReduction}
+                              highSudsRounds={parsed.highSudsRounds}
+                              isTearlessTrauma={parsed.isTearlessTrauma}
                               onContinueTapping={() => handleContinueTapping(parsed.intensity, parsed.phraseType)}
                               onTalkToTapaway={handleTalkToTapaway}
                               onEndSession={handleEndSession}
+                              onQuietIntegration={handleQuietIntegration}
+                              onContactSupport={handleContactSupport}
                             />
                           );
                         }
                         
-                        // Legacy continue-choice (keep for backwards compatibility)
                         if (parsed.type === 'continue-choice') {
                           return (
                             <div key={message.id} className="space-y-3 p-4 bg-secondary/50 rounded-2xl border border-border/50 shadow-soft">
                               <p className="text-sm font-medium">
                                 Great progress! You've reduced your intensity from {sessionContext.initialIntensity}/10 to {parsed.intensity}/10.
                               </p>
-                              <p className="text-sm text-muted-foreground">
-                                Would you like to continue tapping to bring it even lower?
-                              </p>
                               <div className="flex gap-2">
-                                <Button 
-                                  onClick={() => handleContinueTapping(parsed.intensity)}
-                                  size="sm"
-                                >
-                                  Yes, Continue Tapping
-                                </Button>
-                                <Button 
-                                  onClick={handleEndSession}
-                                  size="sm"
-                                  variant="outline"
-                                >
-                                  No, I'm Ready to Finish
-                                </Button>
+                                <Button onClick={() => handleContinueTapping(parsed.intensity)} size="sm">Yes, Continue</Button>
+                                <Button onClick={handleEndSession} size="sm" variant="outline">No, Finish</Button>
                               </div>
                             </div>
                           );
                         }
-                      } catch (e) {
-                        // Not a JSON message, render normally
-                      }
+                      } catch (e) {}
                     }
                     
-                    // Check if this is the LAST bot message AND we're in advice state
                     const isLastBotMessage = message.type === 'bot' && index === messages.length - 1;
                     
                     if (isLastBotMessage && chatState === 'advice') {
@@ -515,10 +430,7 @@ const AIAnxietyBot = () => {
                             isComplete: false
                           }}
                           adviceText={message.content}
-                          onComplete={() => {
-                            console.log('Advice complete, transitioning to complete state');
-                            setChatState('complete');
-                          }}
+                          onComplete={() => setChatState('complete')}
                         />
                       );
                     }
@@ -527,7 +439,6 @@ const AIAnxietyBot = () => {
                   })}
                   {isLoading && <LoadingIndicator />}
                   
-                  {/* Show SessionComplete component after all messages when state is complete */}
                   {chatState === 'complete' && (
                     <SessionComplete 
                       onNewSession={startNewSession}
@@ -535,12 +446,10 @@ const AIAnxietyBot = () => {
                     />
                   )}
                   
-                  {/* Scroll anchor */}
                   <div ref={messagesEndRef} className="h-1" />
                 </div>
               </div>
               
-              {/* Input area */}
               <div className="p-4 border-t border-border/30 bg-gradient-to-t from-muted/20 to-transparent">
                 {renderInput()}
               </div>
@@ -548,7 +457,6 @@ const AIAnxietyBot = () => {
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div>
           {showHistory ? (
             <ChatHistory 
@@ -574,9 +482,11 @@ const AIAnxietyBot = () => {
         </div>
       </div>
       
-      {/* Crisis Support Modal */}
       {showCrisisSupport && (
-        <CrisisSupport onClose={() => setShowCrisisSupport(false)} />
+        <CrisisSupport 
+          onClose={() => setShowCrisisSupport(false)}
+          onSupportContacted={handleSupportContacted}
+        />
       )}
     </div>
   );
