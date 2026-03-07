@@ -55,18 +55,17 @@ const CrisisSupport = ({ onClose, onSupportContacted }: CrisisSupportProps) => {
   const handleCall = (number: string, name: string, isText?: boolean, isUrl?: boolean) => {
     setCallInitiated(name);
     
+    // Track that support was contacted
+    onSupportContacted?.();
+    
     if (isUrl) {
-      // For URLs, open in new tab
       window.open(number, '_blank');
     } else if (isText) {
-      // For text services, open SMS app
       window.location.href = `sms:${number}?body=HOME`;
     } else {
-      // For calls, use tel: protocol
       window.location.href = `tel:${number}`;
     }
     
-    // Reset after 3 seconds
     setTimeout(() => setCallInitiated(null), 3000);
   };
 
