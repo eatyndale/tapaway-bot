@@ -1041,6 +1041,8 @@ Note: The frontend will decide whether to continue tapping, offer a choice, or m
         const totalRoundsNoReduction = sessionContext.totalRoundsWithoutReduction || 0;
         const deepeningCount = sessionContext.deepeningAttempts || 0;
         const hitStrikeLimit = totalRoundsNoReduction >= 3;
+        const isTTTSession = sessionContext.isTearlessTrauma === true;
+        const sessionTypeDesc = sessionContext.sessionType || 'traditional';
         
         systemPrompt += `
 **CURRENT STATE: advice**
