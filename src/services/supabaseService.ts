@@ -301,6 +301,9 @@ class SupabaseService {
     initial_intensity: number;
     industry?: string | null;
     age_group?: string | null;
+    session_type?: string;
+    is_tearless_trauma?: boolean;
+    peak_suds?: number;
   }): Promise<{ session: TappingSession | null; error: any }> {
     const eftScript = generateEFTScript(sessionData.problem, sessionData.feeling, sessionData.body_location);
     
@@ -315,8 +318,11 @@ class SupabaseService {
         industry: sessionData.industry,
         age_group: sessionData.age_group,
         setup_statements: eftScript.setup_statements,
-        reminder_phrases: eftScript.reminder_phrases
-      })
+        reminder_phrases: eftScript.reminder_phrases,
+        session_type: sessionData.session_type || 'traditional',
+        is_tearless_trauma: sessionData.is_tearless_trauma || false,
+        peak_suds: sessionData.peak_suds || sessionData.initial_intensity
+      } as any)
       .select()
       .single();
 
@@ -327,6 +333,9 @@ class SupabaseService {
     final_intensity?: number;
     rounds_completed?: number;
     completed_at?: string;
+    peak_suds?: number;
+    support_contacted?: boolean;
+    quiet_integration_used?: boolean;
   }): Promise<{ session: TappingSession | null; error: any }> {
     const { data, error } = await supabase
       .from('tapping_sessions')
