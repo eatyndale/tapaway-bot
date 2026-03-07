@@ -339,7 +339,7 @@ class SupabaseService {
   }): Promise<{ session: TappingSession | null; error: any }> {
     const { data, error } = await supabase
       .from('tapping_sessions')
-      .update(updates)
+      .update(updates as any)
       .eq('id', sessionId)
       .select()
       .single();
