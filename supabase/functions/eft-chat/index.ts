@@ -748,6 +748,16 @@ CURRENT STAGE GUIDANCE:`;
     console.log('[eft-chat] Current tapping point:', currentTappingPoint);
 
     switch (chatState) {
+      case 'greeting-intensity':
+        // This state is mostly handled by frontend (handleGreetingIntensity)
+        // But if AI is called, just acknowledge
+        systemPrompt += `
+**CURRENT STATE: greeting-intensity**
+The user is rating their initial intensity. Just acknowledge warmly.
+<<DIRECTIVE {"next_state":"greeting-intensity","collect":"intensity"}>>
+`;
+        break;
+        
       case 'conversation':
         const gatheredInfo = {
           hasProblem: !!sessionContext.problem,
