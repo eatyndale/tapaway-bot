@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseService, UserProfile } from '@/services/supabaseService';
-import { ChatState, Message } from '@/components/anxiety-bot/types';
+import { ChatState, Message, SessionType } from '@/components/anxiety-bot/types';
 import { SecureStorage } from '@/utils/secureStorage';
 import { SpellChecker } from '@/utils/spellChecker';
 
@@ -14,7 +14,7 @@ interface SessionContext {
   round?: number;
   setupStatements?: string[];
   reminderPhrases?: string[];
-  aiReminderPhrases?: string[];  // AI-generated natural reminder phrases (8 total)
+  aiReminderPhrases?: string[];
   statementOrder?: number[];
   tappingSessionId?: string;
   roundsWithoutReduction?: number;
@@ -25,8 +25,15 @@ interface SessionContext {
   isDeepening?: boolean;
   deepeningAttempts?: number;
   totalRoundsWithoutReduction?: number;
-  isDeepeningEntry?: boolean;  // True when entering deepening (system context, not user message)
-  deepeningQuestionCount?: number; // Tracks how many probing questions asked in current deepening
+  isDeepeningEntry?: boolean;
+  deepeningQuestionCount?: number;
+  // New fields for revised logic
+  isTearlessTrauma?: boolean;
+  peakSuds?: number;
+  supportContacted?: boolean;
+  quietIntegrationUsed?: boolean;
+  sessionType?: SessionType;
+  highSudsRounds?: number;
 }
 
 interface Directive {
@@ -46,61 +53,56 @@ interface UseAIChatProps {
   onTypoCorrection?: (original: string, corrected: string) => void;
 }
 
-// Directive parsing - improved regex for robustness
+// Directive parsing
 const DIRECTIVE_RE = /<<DIRECTIVE\s+(\{[\s\S]*?\})>>+/;
 const DIRECTIVE_FALLBACK_RE = /<<DIRECTIVE\s+(\{[\s\S]*?\})\}+/;
-// Pattern to strip ANY directive format from visible text
 const DIRECTIVE_STRIP_RE = /<<DIRECTIVE\s+\{[\s\S]*?\}[\}>]+/g;
 
 function parseDirective(text: string): Directive | null {
-  console.log('[parseDirective] Attempting to parse directive from text:', text.substring(text.length - 200));
-  
-  // Try primary pattern first
   let m = text.match(DIRECTIVE_RE);
-  
-  // Fallback: try to match directives with }} instead of >> (common AI mistake)
   if (!m) {
-    console.warn('[parseDirective] Primary pattern failed, trying fallback for }} instead of >>');
     m = text.match(DIRECTIVE_FALLBACK_RE);
-    if (m) {
-      console.warn('[parseDirective] ✓ Found directive with }} instead of >> - fixing it');
-    }
   }
-  
-  if (!m) {
-    console.log('[parseDirective] No directive found in response');
-    return null;
-  }
-  
+  if (!m) return null;
   try {
-    const parsed = JSON.parse(m[1]);
-    console.log('[parseDirective] Successfully parsed directive:', parsed);
-    return parsed;
+    return JSON.parse(m[1]);
   } catch (e) {
-    console.error('[parseDirective] Failed to parse directive JSON:', e);
-    console.error('[parseDirective] Attempted to parse:', m[1]);
+    console.error('[parseDirective] Failed:', e);
     return null;
   }
 }
 
-// Helper function to extract setup statements from AI response (legacy fallback)
 const extractSetupStatements = (response: string): string[] => {
   const statements: string[] = [];
   const lines = response.split('\n');
-  
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed.startsWith('"Even though') && trimmed.endsWith('"')) {
-      // Remove quotes and add to statements
       statements.push(trimmed.slice(1, -1));
     } else if (trimmed.startsWith('Even though')) {
-      // Direct statement without quotes
       statements.push(trimmed);
     }
   }
-  
   return statements;
 };
+
+// TTT generic setup statements
+const TEARLESS_SETUP_STATEMENTS = [
+  "Even though I have this intensity in my system, I'm open to calming now.",
+  "This wave of feeling, I'm allowing myself to settle.",
+  "This activation in my body, I choose to be present."
+];
+
+const TEARLESS_REMINDER_PHRASES = [
+  "This intensity in my body, but I'm allowing calm.",
+  "This activation, I'm choosing to be present.",
+  "This energy in my system, and I'm safe right now.",
+  "Whatever I'm carrying, I'm letting it soften.",
+  "This feeling in my body, and I'm okay.",
+  "I don't need to name it, I'm just allowing it to move.",
+  "This intensity, and I'm choosing peace.",
+  "Whatever this is, I'm letting it settle."
+];
 
 export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, onTypoCorrection }: UseAIChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -139,9 +141,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Get user profile to include industry and age_group
         const { profile } = await supabaseService.getProfile(user.id);
-        
         const { session } = await supabaseService.getOrCreateChatSession(
           user.id,
           profile?.industry || null,
@@ -149,8 +149,6 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         );
         if (session) {
           setCurrentChatSession(session.id);
-          
-          // Load existing messages if any
           if (session.messages && Array.isArray(session.messages) && session.messages.length > 0) {
             const existingMessages = session.messages.map((msg: any, index: number) => ({
               id: msg.id || `msg-${index}`,
@@ -162,7 +160,6 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
             setMessages(existingMessages);
             setConversationHistory(existingMessages);
           } else {
-            // Only add greeting if no existing messages
             createInitialGreeting(session.id);
           }
         }
@@ -172,17 +169,227 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     }
   };
 
+  // REVISED: Greeting now asks for SUDS immediately
   const createInitialGreeting = (sessionId: string) => {
     const greetingMessage: Message = {
       id: `greeting-${Date.now()}`,
       type: 'bot',
-      content: `Hello ${userProfile?.first_name || 'there'}! 💙 I'm here to help you work through what you're feeling using EFT tapping. What's been weighing on you lately?`,
+      content: `Hello ${userProfile?.first_name || 'there'}! 💙 I'm here to help you work through what you're feeling using EFT tapping.\n\nBefore we begin, how are you feeling right now? On a scale of 0 to 10, how intense is your distress?`,
       timestamp: new Date(),
       sessionId: sessionId
     };
     setMessages([greetingMessage]);
     setConversationHistory([greetingMessage]);
   };
+
+  // NEW: Handle the initial SUDS rating and branch to the correct path
+  const handleGreetingIntensity = useCallback(async (intensity: number) => {
+    console.log('[useAIChat] Greeting intensity received:', intensity);
+    
+    const peakSuds = intensity;
+    
+    // Add user message showing rating
+    const userMsg: Message = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      content: `${intensity}/10`,
+      timestamp: new Date(),
+      sessionId: currentChatSession || undefined
+    };
+    setMessages(prev => [...prev, userMsg]);
+    setConversationHistory(prev => [...prev, userMsg]);
+    setIntensityHistory([intensity]);
+
+    // PATH C: SUDS 0 → Quiet Integration
+    if (intensity === 0) {
+      console.log('[useAIChat] PATH C: SUDS 0 → Quiet Integration');
+      
+      const botMsg: Message = {
+        id: `bot-${Date.now()}`,
+        type: 'bot',
+        content: "That's wonderful — you're already in a calm place. 🌿 Let's take a moment of quiet integration to deepen that sense of peace.",
+        timestamp: new Date(),
+        sessionId: currentChatSession || undefined
+      };
+      setMessages(prev => [...prev, botMsg]);
+      setConversationHistory(prev => [...prev, botMsg]);
+      
+      const ctx: SessionContext = {
+        initialIntensity: 0,
+        currentIntensity: 0,
+        peakSuds: 0,
+        sessionType: 'traditional',
+        quietIntegrationUsed: true,
+        round: 0
+      };
+      setSessionContext(ctx);
+      onSessionUpdate(ctx);
+      onStateChange('quiet-integration');
+      return;
+    }
+
+    // PATH B: SUDS 8-10 → Tearless Trauma Therapy
+    if (intensity >= 8) {
+      console.log('[useAIChat] PATH B: SUDS 8-10 → Tearless Trauma Therapy');
+      
+      const botMsg: Message = {
+        id: `bot-${Date.now()}`,
+        type: 'bot',
+        content: "I can feel that intensity is really high right now. You don't need to tell me what's going on — we're going to do some gentle tapping together. Just breathe. You're safe here. 💙\n\nLet's start with some grounding: feel your feet on the ground. Notice one thing you can see. Take a slow breath in... and out.",
+        timestamp: new Date(),
+        sessionId: currentChatSession || undefined
+      };
+      setMessages(prev => [...prev, botMsg]);
+      setConversationHistory(prev => [...prev, botMsg]);
+      
+      // Create tapping session with generic data
+      const { data: { user } } = await supabase.auth.getUser();
+      let tappingSessionId: string | undefined;
+      if (user) {
+        const { profile } = await supabaseService.getProfile(user.id);
+        const { session: tappingSession } = await supabaseService.createTappingSession(user.id, {
+          problem: 'High intensity activation',
+          feeling: 'intense distress',
+          body_location: 'body',
+          initial_intensity: intensity,
+          industry: profile?.industry || null,
+          age_group: profile?.age_group || null,
+          session_type: 'tearless',
+          is_tearless_trauma: true,
+          peak_suds: intensity
+        });
+        if (tappingSession) tappingSessionId = tappingSession.id;
+      }
+      
+      const ctx: SessionContext = {
+        problem: 'High intensity activation',
+        feeling: 'intense distress',
+        bodyLocation: 'body',
+        initialIntensity: intensity,
+        currentIntensity: intensity,
+        peakSuds: intensity,
+        isTearlessTrauma: true,
+        sessionType: 'tearless',
+        round: 1,
+        setupStatements: TEARLESS_SETUP_STATEMENTS,
+        aiReminderPhrases: TEARLESS_REMINDER_PHRASES,
+        statementOrder: [0, 1, 2, 0, 1, 2, 1, 0],
+        reminderPhraseType: 'acknowledging',
+        highSudsRounds: 0,
+        tappingSessionId
+      };
+      setSessionContext(ctx);
+      onSessionUpdate(ctx);
+      setCurrentTappingPoint(0);
+      
+      // Go directly to setup (karate chop)
+      onStateChange('setup');
+      return;
+    }
+
+    // PATH A: SUDS 1-7 → Traditional EFT (conversation flow)
+    console.log('[useAIChat] PATH A: SUDS 1-7 → Traditional EFT conversation');
+    
+    const ctx: SessionContext = {
+      initialIntensity: intensity,
+      currentIntensity: intensity,
+      peakSuds: intensity,
+      sessionType: 'traditional',
+      round: 0
+    };
+    setSessionContext(ctx);
+    onSessionUpdate(ctx);
+    
+    const botMsg: Message = {
+      id: `bot-${Date.now()}`,
+      type: 'bot',
+      content: `Got it — ${intensity}/10. Thanks for sharing that. 💙\n\nNow tell me, what's been weighing on you lately? What's brought that ${intensity > 4 ? 'intensity' : 'feeling'} up?`,
+      timestamp: new Date(),
+      sessionId: currentChatSession || undefined
+    };
+    setMessages(prev => [...prev, botMsg]);
+    setConversationHistory(prev => [...prev, botMsg]);
+    
+    onStateChange('conversation');
+  }, [currentChatSession, userProfile, onStateChange, onSessionUpdate]);
+
+  // Handle Quiet Integration completion
+  const handleQuietIntegrationComplete = useCallback(async (response: 'settled' | 'returned' | 'unsure') => {
+    console.log('[useAIChat] Quiet Integration response:', response);
+    
+    const updatedContext = {
+      ...sessionContext,
+      quietIntegrationUsed: true
+    };
+    setSessionContext(updatedContext);
+    onSessionUpdate(updatedContext);
+
+    if (response === 'settled') {
+      // Offer another round or end
+      const botMsg: Message = {
+        id: `bot-${Date.now()}`,
+        type: 'bot',
+        content: "That's lovely to hear. 🌿 You've done wonderful work today.",
+        timestamp: new Date(),
+        sessionId: currentChatSession || undefined
+      };
+      setMessages(prev => [...prev, botMsg]);
+      setConversationHistory(prev => [...prev, botMsg]);
+      
+      // If this was initial SUDS 0, go to advice
+      if (sessionContext.initialIntensity === 0) {
+        onStateChange('advice');
+        await sendMessage(
+          `I feel settled. My intensity is 0/10.`,
+          'advice',
+          { currentIntensity: 0 }
+        );
+      } else {
+        // Complete and go to advice
+        if (sessionContext.tappingSessionId) {
+          await completeTappingSession(sessionContext.currentIntensity || 0);
+        }
+        onStateChange('advice');
+        await sendMessage(
+          `I feel settled after quiet integration. My final intensity is ${sessionContext.currentIntensity || 0}/10. Initial was ${sessionContext.initialIntensity}/10.`,
+          'advice',
+          { currentIntensity: sessionContext.currentIntensity || 0 }
+        );
+      }
+    } else if (response === 'returned') {
+      // Return to tapping flow
+      const botMsg: Message = {
+        id: `bot-${Date.now()}`,
+        type: 'bot',
+        content: "That's perfectly okay — let's work with what's come back. We'll do another round of tapping. 💙",
+        timestamp: new Date(),
+        sessionId: currentChatSession || undefined
+      };
+      setMessages(prev => [...prev, botMsg]);
+      setConversationHistory(prev => [...prev, botMsg]);
+      
+      // If we have session data, start a new tapping round
+      if (sessionContext.setupStatements && sessionContext.setupStatements.length > 0) {
+        await startNewTappingRound(sessionContext.currentIntensity || 3, sessionContext.reminderPhraseType);
+      } else {
+        // Go to conversation to gather info
+        onStateChange('conversation');
+      }
+    } else {
+      // 'unsure' → another Quiet Integration round
+      const botMsg: Message = {
+        id: `bot-${Date.now()}`,
+        type: 'bot',
+        content: "That's completely fine. Let's take another quiet moment together. 🌿",
+        timestamp: new Date(),
+        sessionId: currentChatSession || undefined
+      };
+      setMessages(prev => [...prev, botMsg]);
+      setConversationHistory(prev => [...prev, botMsg]);
+      
+      onStateChange('quiet-integration');
+    }
+  }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate]);
 
   const sendMessage = useCallback(async (
     userMessage: string, 
@@ -193,23 +400,19 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
 
     setIsLoading(true);
 
-    // Enhanced typo correction and validation
     const correctionResult = SpellChecker.correctWithFuzzyMatching(userMessage);
     let processedMessage = correctionResult.corrected;
     
-    // Notify about corrections if any were made
     if (correctionResult.changes.length > 0 && onTypoCorrection) {
       onTypoCorrection(userMessage, processedMessage);
     }
 
-    // Check if this is a deepening entry (system context, not a real user message)
     const isDeepeningEntryRequest = (additionalContext as any)?.isDeepeningEntry === true;
     
-    // Add user message ONLY if it's not a deepening entry (those are hidden)
     const userMsg: Message = {
       id: `user-${Date.now()}`,
       type: 'user',
-      content: userMessage, // Keep original for display
+      content: userMessage,
       timestamp: new Date(),
       sessionId: currentChatSession
     };
@@ -219,63 +422,52 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       setMessages(updatedMessages);
     }
 
-    // CRITICAL: Build request context (for API call) vs persisted context (for state)
-    // isDeepeningEntry should NOT be persisted - it's a one-shot flag for this single request
     const requestContext = { ...sessionContext, ...additionalContext };
-    
-    // Remove isDeepeningEntry from what we persist to avoid sticky flag
     const persistedContext = { ...requestContext };
     delete persistedContext.isDeepeningEntry;
 
-    // NEW: Intercept post-tapping or tapping-breathing intensity submission
+    // Intercept post-tapping/breathing intensity
     if ((chatState === 'post-tapping' || chatState === 'tapping-breathing') && additionalContext?.currentIntensity !== undefined) {
-      console.log('[useAIChat] Post-tapping/breathing intensity detected - frontend will handle decision');
-      
-      // Update session context
       setSessionContext(persistedContext);
       onSessionUpdate(persistedContext);
       
-      // Track intensity
       const newHistory = [...intensityHistory, additionalContext.currentIntensity];
       setIntensityHistory(newHistory);
       
-      // Add user message
-      const userMsg: Message = {
+      const intensityMsg: Message = {
         id: `user-${Date.now()}`,
         type: 'user',
         content: userMessage,
         timestamp: new Date(),
         sessionId: currentChatSession
       };
-      setMessages(prev => [...prev, userMsg]);
+      setMessages(prev => [...prev, intensityMsg]);
       
-      // Frontend handles the decision (don't call AI yet)
       await handlePostTappingIntensity(additionalContext.currentIntensity);
-      
       setIsLoading(false);
-      return; // Exit early - frontend is in control now
+      return;
     }
     
-    // Track intensity changes
     if (additionalContext?.currentIntensity !== undefined) {
       const newHistory = [...intensityHistory, additionalContext.currentIntensity];
       setIntensityHistory(newHistory);
     }
     
-    // Create tapping session when initial intensity is collected
+    // Create tapping session when initial intensity is collected (Path A only)
     if (chatState === 'gathering-intensity' && additionalContext?.initialIntensity) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user && persistedContext.problem && persistedContext.feeling && persistedContext.bodyLocation) {
-        // Get user profile for industry and age_group
         const { profile } = await supabaseService.getProfile(user.id);
-        
         const { session: tappingSession } = await supabaseService.createTappingSession(user.id, {
           problem: persistedContext.problem,
           feeling: persistedContext.feeling,
           body_location: persistedContext.bodyLocation,
           initial_intensity: additionalContext.initialIntensity,
           industry: profile?.industry || null,
-          age_group: profile?.age_group || null
+          age_group: profile?.age_group || null,
+          session_type: persistedContext.sessionType || 'traditional',
+          is_tearless_trauma: persistedContext.isTearlessTrauma || false,
+          peak_suds: persistedContext.peakSuds || additionalContext.initialIntensity
         });
         if (tappingSession) {
           persistedContext.tappingSessionId = tappingSession.id;
@@ -288,43 +480,34 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     onSessionUpdate(persistedContext);
 
     try {
-      // Get last assistant message for context
       const lastAssistantMessage = conversationHistory
         .filter(m => m.type === 'bot')
         .slice(-1)[0]?.content || '';
       
-      // Call AI function with enhanced context
-      // IMPORTANT: Use requestContext (includes isDeepeningEntry) for the API call
       const { data, error } = await supabase.functions.invoke('eft-chat', {
         body: {
-          message: processedMessage, // Use corrected message for AI processing
+          message: processedMessage,
           chatState,
           userName: userProfile.first_name,
-          sessionContext: requestContext, // Use requestContext which includes isDeepeningEntry
-          conversationHistory: conversationHistory.slice(-20), // Increased context window
+          sessionContext: requestContext,
+          conversationHistory: conversationHistory.slice(-20),
           currentTappingPoint,
           intensityHistory,
-          lastAssistantMessage  // NEW: pass for classification context
+          lastAssistantMessage
         }
       });
 
       if (error) throw error;
 
-      // Parse directive and strip it from visible content
       const directive = parseDirective(data.response);
-      // Strip ALL directive formats from visible text (handles >>, }}, >>> variants)
       let visibleContent = data.response.replace(DIRECTIVE_STRIP_RE, '').trim();
       
-      // SAFEGUARD: If visibleContent is empty after stripping, provide a fallback
-      // This prevents "blank bot message" situations that require double submission
       if (!visibleContent || visibleContent.length === 0) {
-        console.warn('[useAIChat] Empty visible content after stripping directive - using fallback');
         visibleContent = "I'm here with you. Can you tell me a bit more about what you're experiencing?";
       }
       
-      // DEFENSIVE: Strip leaked setup statements from visible content if transitioning to setup
+      // Strip leaked setup statements
       if (directive?.next_state === 'setup' && directive.setup_statements) {
-        // Remove numbered lists of "Even though..." statements
         visibleContent = visibleContent
           .replace(/\d+\.\s*"?Even though[^"]*"?\.?\s*/gi, '')
           .replace(/\d+\.\s*Even though[^.]*\.\s*/gi, '')
@@ -333,11 +516,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           .replace(/Here are some new setup statements[^:]*:\s*/gi, '')
           .replace(/Let's tap on this new layer[^.]*\.\s*/gi, "Let's tap on this new layer.")
           .trim();
-        console.log('[useAIChat] Stripped leaked setup statements from visible content');
       }
-
-      console.log('[useAIChat] AI Response received. Has directive:', !!directive);
-      console.log('[useAIChat] Current state:', chatState);
 
       // Use cleaned extracted values from edge function
       if (data.extractedContext) {
@@ -347,7 +526,6 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         if (data.extractedContext.currentIntensity !== undefined) {
           persistedContext.currentIntensity = data.extractedContext.currentIntensity;
         }
-        // Persist deepeningQuestionCount from server
         if (data.extractedContext.deepeningQuestionCount !== undefined) {
           persistedContext.deepeningQuestionCount = data.extractedContext.deepeningQuestionCount;
         }
@@ -355,7 +533,6 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         onSessionUpdate(persistedContext);
       }
 
-      // Add AI response with stripped content
       const aiMsg: Message = {
         id: `ai-${Date.now()}`,
         type: 'bot',
@@ -368,21 +545,13 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       setMessages(finalMessages);
       setConversationHistory(finalMessages);
 
-      // Apply directive-first flow
       if (directive) {
         const next = directive.next_state;
-        console.log('[useAIChat] Directive next_state:', next);
-        console.log('[useAIChat] Directive tapping_point:', directive.tapping_point);
         
-        // Start-of-round: store statements + order + AI reminder phrases (for both 'setup' and 'tapping-point' transitions)
         if ((next === 'setup' || next === 'tapping-point') && directive.setup_statements) {
           const setupStatements = directive.setup_statements ?? persistedContext.setupStatements ?? [];
           const statementOrder = directive.statement_order ?? persistedContext.statementOrder ?? [0, 1, 2, 0, 1, 2, 1, 0];
-          // Store AI-generated reminder phrases if provided
           const aiReminderPhrases = (directive as any).reminder_phrases ?? persistedContext.aiReminderPhrases ?? null;
-          console.log('[useAIChat] Storing setup statements:', setupStatements);
-          console.log('[useAIChat] Storing statement order:', statementOrder);
-          console.log('[useAIChat] Storing AI reminder phrases:', aiReminderPhrases);
           persistedContext.setupStatements = setupStatements;
           persistedContext.statementOrder = statementOrder;
           if (aiReminderPhrases) {
@@ -391,68 +560,36 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           setSessionContext(persistedContext);
           onSessionUpdate(persistedContext);
           
-          // Reset tapping point for new round
           if (next === 'setup') {
             setCurrentTappingPoint(0);
           }
         }
 
-        // Point advancement: update current tapping point
         if (next === 'tapping-point' && typeof directive.tapping_point === 'number') {
-          console.log('[useAIChat] Setting tapping point to:', directive.tapping_point);
           setCurrentTappingPoint(directive.tapping_point);
         }
 
-        // State transition with validation
         if (next && next !== chatState) {
-          console.log('[useAIChat] Transitioning state from', chatState, 'to', next);
-          
-          // Validate state transitions (warning only, don't block)
-          const validTransitions: Record<string, string[]> = {
-            'conversation': ['gathering-intensity', 'conversation-deepening'],
-            'conversation-deepening': ['setup', 'conversation-deepening'],
-            'gathering-intensity': ['setup'],
-            'setup': ['tapping-point'],
-            'tapping-point': ['tapping-point', 'tapping-breathing'],
-            'tapping-breathing': ['post-tapping'],
-            'post-tapping': ['setup', 'conversation', 'conversation-deepening', 'advice'],
-            'advice': ['complete', 'conversation']
-          };
-          
-          const allowedNextStates = validTransitions[chatState] || [];
-          if (!allowedNextStates.includes(next)) {
-            console.warn(`[useAIChat] ⚠️ UNEXPECTED TRANSITION: ${chatState} → ${next}`);
-            console.warn('[useAIChat] Expected transitions:', allowedNextStates);
-            console.warn('[useAIChat] Allowing transition anyway - trusting AI directive');
-          }
-          
-          // Always allow the transition
           onStateChange(next as ChatState);
         }
       } else {
-        console.log('[useAIChat] No directive found, using fallback logic');
-        
-        // Fallback: Extract setup statements if present in response
+        // Fallback logic
         if (visibleContent.includes('Even though')) {
           const setupStatements = extractSetupStatements(visibleContent);
           if (setupStatements.length > 0) {
-            console.log('[useAIChat] Extracted setup statements (fallback):', setupStatements);
             persistedContext.setupStatements = setupStatements;
             setSessionContext(persistedContext);
             onSessionUpdate(persistedContext);
           }
         }
 
-        // Handle state transitions based on AI response and current state (use visibleContent)
         const nextState = determineNextState(chatState, visibleContent);
         if (nextState && nextState !== chatState) {
-          console.log('[useAIChat] Fallback state transition from', chatState, 'to', nextState);
           onStateChange(nextState);
         }
       }
 
-      // Update chat session in database
-      // Generate session name based on emotions if we have session context
+      // Update chat session
       let sessionName;
       if (persistedContext.feeling || persistedContext.problem) {
         sessionName = supabaseService.generateSessionName(
@@ -467,17 +604,14 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         session_name: sessionName
       });
 
-      // Handle crisis detection
       if (data.crisisDetected) {
         setCrisisDetected(true);
         onCrisisDetected?.();
-        onStateChange('complete'); // End session and show crisis resources
+        onStateChange('complete');
       }
 
     } catch (error) {
       console.error('Error sending message:', error);
-      
-      // Add error message
       const errorMsg: Message = {
         id: `error-${Date.now()}`,
         type: 'bot',
@@ -485,80 +619,98 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         timestamp: new Date(),
         sessionId: currentChatSession
       };
-
       setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
   }, [messages, userProfile, currentChatSession, sessionContext, conversationHistory, onStateChange, onSessionUpdate, onCrisisDetected]);
 
+  const convertEmotionToNoun = (emotion: string): string => {
+    const lower = emotion.toLowerCase().trim();
+    const map: Record<string, string> = {
+      'anxious': 'anxiety', 'sad': 'sadness', 'stressed': 'stress',
+      'overwhelmed': 'overwhelm', 'tired': 'tiredness', 'exhausted': 'exhaustion',
+      'worried': 'worry', 'scared': 'fear', 'afraid': 'fear',
+      'frustrated': 'frustration', 'angry': 'anger', 'depressed': 'depression',
+      'nervous': 'nervousness', 'lonely': 'loneliness', 'hopeless': 'hopelessness',
+      'helpless': 'helplessness', 'panicked': 'panic', 'terrified': 'terror',
+      'disappointed': 'disappointment', 'guilty': 'guilt', 'ashamed': 'shame',
+      'embarrassed': 'embarrassment', 'jealous': 'jealousy', 'resentful': 'resentment',
+      'bitter': 'bitterness', 'insecure': 'insecurity', 'confused': 'confusion'
+    };
+    if (map[lower]) return map[lower];
+    if (lower.endsWith('ness') || lower.endsWith('tion') || lower.endsWith('ment') || 
+        lower.endsWith('ity') || lower.endsWith('ion')) return lower;
+    return `${emotion} feeling`;
+  };
+
   const startNewTappingRound = useCallback(async (currentIntensity: number, phraseType?: 'acknowledging' | 'partial-release' | 'full-release') => {
     console.log('[useAIChat] Starting new tapping round with intensity:', currentIntensity);
     
-    // Generate new setup statements based on current intensity and phrase type
     const feeling = sessionContext.feeling || 'this feeling';
     const bodyLocation = sessionContext.bodyLocation || 'my body';
     const problem = sessionContext.problem || 'this issue';
+    const isTTT = sessionContext.isTearlessTrauma;
     
-    // Determine reminder phrase type based on intensity if not provided
     const determinedPhraseType = phraseType || (
       currentIntensity > 3 ? 'acknowledging' : 
       currentIntensity > 0 ? 'partial-release' : 
       'full-release'
     );
     
-    // Helper function to convert adjective emotions to noun forms
-    const convertEmotionToNoun = (emotion: string): string => {
-      const lower = emotion.toLowerCase().trim();
-      const emotionToNoun: Record<string, string> = {
-        'anxious': 'anxiety', 'sad': 'sadness', 'stressed': 'stress',
-        'overwhelmed': 'overwhelm', 'tired': 'tiredness', 'exhausted': 'exhaustion',
-        'worried': 'worry', 'scared': 'fear', 'afraid': 'fear',
-        'frustrated': 'frustration', 'angry': 'anger', 'depressed': 'depression',
-        'nervous': 'nervousness', 'lonely': 'loneliness', 'hopeless': 'hopelessness',
-        'helpless': 'helplessness', 'panicked': 'panic', 'terrified': 'terror',
-        'disappointed': 'disappointment', 'guilty': 'guilt', 'ashamed': 'shame',
-        'embarrassed': 'embarrassment', 'jealous': 'jealousy', 'resentful': 'resentment',
-        'bitter': 'bitterness', 'insecure': 'insecurity', 'confused': 'confusion'
-      };
-      if (emotionToNoun[lower]) return emotionToNoun[lower];
-      // If already ends with noun suffixes, return as-is
-      if (lower.endsWith('ness') || lower.endsWith('tion') || lower.endsWith('ment') || 
-          lower.endsWith('ity') || lower.endsWith('ion')) return lower;
-      return `${emotion} feeling`;
-    };
+    let newSetupStatements: string[];
+    let newReminderPhrases: string[] | undefined;
     
-    const feelingNoun = convertEmotionToNoun(feeling);
+    if (isTTT) {
+      // TTT: Use generic statements
+      newSetupStatements = [
+        "Even though I still have this intensity in my system, I'm allowing it to settle.",
+        "This remaining activation, I choose to be present and calm.",
+        "Whatever I'm still carrying, I'm safe and I'm letting it soften."
+      ];
+      newReminderPhrases = TEARLESS_REMINDER_PHRASES;
+    } else {
+      const feelingNoun = convertEmotionToNoun(feeling);
+      // Positive affirmations for low SUDS
+      if (currentIntensity <= 3) {
+        newSetupStatements = [
+          `Even though I still have some of this ${feelingNoun}, I'm letting it go now`,
+          `This remaining ${feelingNoun} in my ${bodyLocation}, I choose to release it`,
+          `I'm releasing this last bit of ${feelingNoun} and choosing peace`
+        ];
+      } else {
+        newSetupStatements = [
+          `Even though I still have this ${feelingNoun} in my ${bodyLocation}, I deeply and completely accept myself`,
+          `Even though ${problem} is still affecting me, I choose to accept myself anyway`,
+          `Even with this remaining ${feelingNoun}, I'm making progress and I accept myself`
+        ];
+      }
+    }
     
-    const newSetupStatements = [
-      `Even though I still have this ${feelingNoun} in my ${bodyLocation}, I deeply and completely accept myself`,
-      `Even though ${problem} is still affecting me, I choose to accept myself anyway`,
-      `Even with this remaining ${feelingNoun}, I'm making progress and I accept myself`
-    ];
-    
-    const statementOrder = [0, 1, 2, 0, 1, 2, 1, 0]; // Standard order
-    
-    // Increment round number
+    const statementOrder = [0, 1, 2, 0, 1, 2, 1, 0];
     const newRound = (sessionContext.round || 1) + 1;
     
-    // Update session context with phrase type and preserve deepening tracking
-    const updatedContext = {
+    const updatedContext: SessionContext = {
       ...sessionContext,
       currentIntensity: currentIntensity,
       round: newRound,
       setupStatements: newSetupStatements,
       statementOrder: statementOrder,
       reminderPhraseType: determinedPhraseType,
-      // Preserve deepening tracking
       totalRoundsWithoutReduction: sessionContext.totalRoundsWithoutReduction || 0,
       deepeningAttempts: sessionContext.deepeningAttempts || 0,
-      isDeepening: false // Reset deepening flag for new round
+      isDeepening: false,
+      // Update peak SUDS
+      peakSuds: Math.max(sessionContext.peakSuds || 0, currentIntensity)
     };
+    
+    if (newReminderPhrases) {
+      updatedContext.aiReminderPhrases = newReminderPhrases;
+    }
     
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);
     
-    // Update tapping session with new round count
     if (updatedContext.tappingSessionId) {
       await supabaseService.updateTappingSession(updatedContext.tappingSessionId, {
         rounds_completed: newRound,
@@ -566,14 +718,14 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       });
     }
     
-    // Reset tapping point to 0
     setCurrentTappingPoint(0);
     
-    // Add system message to show we're starting a new round BEFORE state change
     const roundMessage: Message = {
       id: `round-${Date.now()}`,
       type: 'bot',
-      content: `Let's do another round of tapping to bring that ${feeling} down even more. Take a deep breath...`,
+      content: isTTT 
+        ? `Let's do another gentle round. Take a deep breath...`
+        : `Let's do another round of tapping to bring that ${feeling} down even more. Take a deep breath...`,
       timestamp: new Date(),
       sessionId: currentChatSession
     };
@@ -581,31 +733,34 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     setMessages(prev => [...prev, roundMessage]);
     setConversationHistory(prev => [...prev, roundMessage]);
     
-    // Go to setup phase first (karate chop), then tapping sequence
     setTimeout(() => {
       onStateChange('setup');
     }, 0);
     
-  }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate, setCurrentTappingPoint, setMessages, setConversationHistory]);
+  }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate]);
 
   const completeTappingSession = useCallback(async (finalIntensity: number) => {
     if (sessionContext.tappingSessionId) {
       await supabaseService.updateTappingSession(sessionContext.tappingSessionId, {
         final_intensity: finalIntensity,
         rounds_completed: sessionContext.round || 1,
-        completed_at: new Date().toISOString()
+        completed_at: new Date().toISOString(),
+        peak_suds: sessionContext.peakSuds,
+        support_contacted: sessionContext.supportContacted || false,
+        quiet_integration_used: sessionContext.quietIntegrationUsed || false
       });
     }
   }, [sessionContext]);
 
+  // REVISED: Post-tapping decision tree
   const handlePostTappingIntensity = useCallback(async (newIntensity: number) => {
-    console.log('[useAIChat] Post-tapping intensity received:', newIntensity);
-    console.log('[useAIChat] Initial intensity was:', sessionContext.initialIntensity);
+    console.log('[useAIChat] Post-tapping intensity:', newIntensity, 'TTT:', sessionContext.isTearlessTrauma);
     
     const initialIntensity = sessionContext.initialIntensity || 10;
     const previousIntensity = sessionContext.currentIntensity || initialIntensity;
     const improvement = initialIntensity - newIntensity;
     const roundImprovement = previousIntensity - newIntensity;
+    const isTTT = sessionContext.isTearlessTrauma;
     
     // Track rounds without reduction
     const noReduction = roundImprovement <= 0;
@@ -613,12 +768,15 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       ? (sessionContext.roundsWithoutReduction || 0) + 1 
       : 0;
     
-    // Track total rounds without meaningful reduction (intensity still >= 5)
-    const totalRoundsWithoutReduction = newIntensity >= 5 
-      ? (sessionContext.totalRoundsWithoutReduction || 0) + 1
+    // Track high SUDS rounds (8-10)
+    const highSudsRounds = newIntensity >= 8 
+      ? (sessionContext.highSudsRounds || 0) + 1
       : 0;
     
-    // Determine reminder phrase type for next round
+    // Update peak SUDS
+    const peakSuds = Math.max(sessionContext.peakSuds || 0, newIntensity);
+    
+    // Determine reminder phrase type
     let phraseType: 'acknowledging' | 'partial-release' | 'full-release';
     if (newIntensity > 3) {
       phraseType = 'acknowledging';
@@ -628,74 +786,36 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       phraseType = 'full-release';
     }
     
-    // Update context with tracking info
-    const updatedContext = {
+    const updatedContext: SessionContext = {
       ...sessionContext,
       currentIntensity: newIntensity,
       roundsWithoutReduction,
-      totalRoundsWithoutReduction,
+      highSudsRounds,
+      peakSuds,
       reminderPhraseType: phraseType,
       previousIntensities: [...(sessionContext.previousIntensities || []), newIntensity]
     };
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);
     
-    // Decision logic based on intensity
+    // SUDS 0: Auto-complete → advice
     if (newIntensity === 0) {
-      // Perfect! Complete session and go to advice
-      console.log('[useAIChat] Intensity is 0 - completing session and transitioning to advice');
-      
-      await completeTappingSession(newIntensity);
+      console.log('[useAIChat] SUDS 0 - auto-complete');
+      await completeTappingSession(0);
       onStateChange('advice');
-      
       await sendMessage(
         `My intensity is now 0/10. Initial was ${initialIntensity}/10.`,
         'advice',
         { currentIntensity: 0 }
       );
+      return;
+    }
+    
+    // SUDS 8-10: Grounding → auto-repeat. After 3 rounds at 8-10, show End + Contact Support
+    if (newIntensity >= 8) {
+      console.log('[useAIChat] SUDS 8-10, highSudsRounds:', highSudsRounds);
       
-    } else if (totalRoundsWithoutReduction >= 3) {
-      // 3-STRIKE LIMIT: After 3 rounds without reducing below 5, go to advice
-      console.log('[useAIChat] 3-strike limit reached - transitioning to advice');
-      
-      await completeTappingSession(newIntensity);
-      onStateChange('advice');
-      
-      await sendMessage(
-        `After ${sessionContext.round || 3} rounds, my intensity is at ${newIntensity}/10. Initial was ${initialIntensity}/10. We've tried deepening ${sessionContext.deepeningAttempts || 0} times.`,
-        'advice',
-        { currentIntensity: newIntensity, totalRoundsWithoutReduction }
-      );
-      
-    } else if (newIntensity >= 5 && totalRoundsWithoutReduction >= 1) {
-      // AUTO-DEEPENING: Intensity still >= 5 after a round, trigger deepening conversation
-      console.log('[useAIChat] Intensity still >= 5, triggering conversation-deepening state');
-      
-      const deepeningContext = {
-        ...updatedContext,
-        isDeepening: true,
-        deepeningAttempts: 0  // Start at 0 - will be incremented on actual user responses
-      };
-      
-      setSessionContext(deepeningContext);
-      onSessionUpdate(deepeningContext);
-      
-      // Transition to dedicated deepening state (not regular conversation)
-      onStateChange('conversation-deepening');
-      
-      // Send MINIMAL entry marker to get AI's first probing question
-      // This is NOT a user message - it's hidden system context
-      // CRITICAL: Keep marker minimal to avoid biasing AI evaluation
-      await sendMessage(
-        `[DEEPENING_ENTRY]`,
-        'conversation-deepening',
-        { ...deepeningContext, isDeepeningEntry: true, deepeningQuestionCount: 0 }
-      );
-      
-    } else {
-      // Show post-tapping choice UI (handles all cases: low intensity, good progress)
-      console.log('[useAIChat] Showing post-tapping choice UI');
-      
+      // Show choice UI (PostTappingChoice handles grounding vs support based on highSudsRounds)
       const choiceMessage: Message = {
         id: `choice-${Date.now()}`,
         type: 'system',
@@ -706,34 +826,157 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           improvement,
           round: sessionContext.round || 1,
           roundsWithoutReduction,
+          highSudsRounds,
+          isTearlessTrauma: isTTT,
           phraseType
         }),
         timestamp: new Date(),
         sessionId: currentChatSession
       };
-      
       setMessages(prev => [...prev, choiceMessage]);
       setConversationHistory(prev => [...prev, choiceMessage]);
+      return;
     }
-  }, [sessionContext, currentChatSession, messages, onStateChange, sendMessage, setConversationHistory, setMessages, completeTappingSession, onSessionUpdate]);
-
-  // Handle "Talk to Tapaway" - go back to conversation for deeper inquiry
-  const handleTalkToTapaway = useCallback(async () => {
-    console.log('[useAIChat] User chose to talk to Tapaway for deeper inquiry');
     
-    const updatedContext = {
+    // SUDS 3-7: Check for deepening or show choices
+    if (newIntensity >= 3) {
+      // If TTT and SUDS dropped to 3-7, could transition to traditional
+      if (isTTT) {
+        // Show choice to either continue TTT or transition to talking
+        const choiceMessage: Message = {
+          id: `choice-${Date.now()}`,
+          type: 'system',
+          content: JSON.stringify({
+            type: 'post-tapping-choice',
+            intensity: newIntensity,
+            initialIntensity,
+            improvement,
+            round: sessionContext.round || 1,
+            roundsWithoutReduction,
+            highSudsRounds: 0,
+            isTearlessTrauma: true,
+            phraseType
+          }),
+          timestamp: new Date(),
+          sessionId: currentChatSession
+        };
+        setMessages(prev => [...prev, choiceMessage]);
+        setConversationHistory(prev => [...prev, choiceMessage]);
+        return;
+      }
+      
+      // Traditional path: auto-deepening if stuck
+      const totalRoundsWithoutReduction = newIntensity >= 5 
+        ? (sessionContext.totalRoundsWithoutReduction || 0) + 1
+        : 0;
+      
+      if (totalRoundsWithoutReduction >= 3) {
+        // 3-strike: offer Quiet Integration instead of just ending
+        console.log('[useAIChat] 3-strike limit - offering quiet integration');
+        const choiceMessage: Message = {
+          id: `choice-${Date.now()}`,
+          type: 'system',
+          content: JSON.stringify({
+            type: 'post-tapping-choice',
+            intensity: newIntensity,
+            initialIntensity,
+            improvement,
+            round: sessionContext.round || 1,
+            roundsWithoutReduction: 3,
+            highSudsRounds: 0,
+            phraseType
+          }),
+          timestamp: new Date(),
+          sessionId: currentChatSession
+        };
+        setMessages(prev => [...prev, choiceMessage]);
+        setConversationHistory(prev => [...prev, choiceMessage]);
+        return;
+      }
+      
+      if (newIntensity >= 5 && totalRoundsWithoutReduction >= 1) {
+        // Auto-deepening
+        const deepeningContext = {
+          ...updatedContext,
+          isDeepening: true,
+          deepeningAttempts: 0,
+          totalRoundsWithoutReduction
+        };
+        setSessionContext(deepeningContext);
+        onSessionUpdate(deepeningContext);
+        
+        onStateChange('conversation-deepening');
+        await sendMessage(
+          `[DEEPENING_ENTRY]`,
+          'conversation-deepening',
+          { ...deepeningContext, isDeepeningEntry: true, deepeningQuestionCount: 0 }
+        );
+        return;
+      }
+      
+      // Show standard choices
+      const choiceMessage: Message = {
+        id: `choice-${Date.now()}`,
+        type: 'system',
+        content: JSON.stringify({
+          type: 'post-tapping-choice',
+          intensity: newIntensity,
+          initialIntensity,
+          improvement,
+          round: sessionContext.round || 1,
+          roundsWithoutReduction,
+          highSudsRounds: 0,
+          phraseType
+        }),
+        timestamp: new Date(),
+        sessionId: currentChatSession
+      };
+      setMessages(prev => [...prev, choiceMessage]);
+      setConversationHistory(prev => [...prev, choiceMessage]);
+      return;
+    }
+    
+    // SUDS 1-2: Show 4-button choice (Continue, Chat, Quiet Integration, End)
+    console.log('[useAIChat] SUDS 1-2 - showing 4 choices');
+    const choiceMessage: Message = {
+      id: `choice-${Date.now()}`,
+      type: 'system',
+      content: JSON.stringify({
+        type: 'post-tapping-choice',
+        intensity: newIntensity,
+        initialIntensity,
+        improvement,
+        round: sessionContext.round || 1,
+        roundsWithoutReduction,
+        highSudsRounds: 0,
+        phraseType
+      }),
+      timestamp: new Date(),
+      sessionId: currentChatSession
+    };
+    setMessages(prev => [...prev, choiceMessage]);
+    setConversationHistory(prev => [...prev, choiceMessage]);
+    
+  }, [sessionContext, currentChatSession, messages, onStateChange, sendMessage, completeTappingSession, onSessionUpdate]);
+
+  const handleTalkToTapaway = useCallback(async () => {
+    console.log('[useAIChat] User chose to talk to Tapaway');
+    
+    // If coming from TTT, mark session as mixed
+    const updatedContext: SessionContext = {
       ...sessionContext,
       returningFromTapping: true,
-      deepeningLevel: (sessionContext.deepeningLevel || 0) + 1
+      deepeningLevel: (sessionContext.deepeningLevel || 0) + 1,
+      sessionType: sessionContext.isTearlessTrauma ? 'mixed' : sessionContext.sessionType,
+      isTearlessTrauma: false // Switch to traditional for conversation
     };
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);
     
-    // Add a message to indicate we're going back to chat
     const transitionMessage: Message = {
       id: `transition-${Date.now()}`,
       type: 'bot',
-      content: `Let's explore this a bit more. What else is on your mind about this ${sessionContext.feeling || 'feeling'}? Sometimes there's more underneath the surface.`,
+      content: `Let's explore this a bit more. What's on your mind? Sometimes there's more underneath the surface. 💙`,
       timestamp: new Date(),
       sessionId: currentChatSession
     };
@@ -744,71 +987,46 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     onStateChange('conversation');
   }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate]);
 
-  const determineNextState = (currentState: ChatState, aiResponse: string): ChatState | null => {
-    console.log('[determineNextState] FALLBACK LOGIC - Current state:', currentState);
-    console.log('[determineNextState] AI response preview:', aiResponse.substring(0, 150));
+  // Track support contact
+  const handleSupportContacted = useCallback(async () => {
+    const updatedContext = {
+      ...sessionContext,
+      supportContacted: true
+    };
+    setSessionContext(updatedContext);
+    onSessionUpdate(updatedContext);
     
+    if (sessionContext.tappingSessionId) {
+      await supabaseService.updateTappingSession(sessionContext.tappingSessionId, {
+        support_contacted: true
+      });
+    }
+  }, [sessionContext, onSessionUpdate]);
+
+  const determineNextState = (currentState: ChatState, aiResponse: string): ChatState | null => {
     const response = aiResponse.toLowerCase();
     
-    // Explicit state machine with keyword detection
     switch (currentState) {
       case 'conversation':
-        // In conversation mode, look for intensity collection keywords
-        if (response.includes('scale of 0') || 
-            response.includes('how intense') ||
-            response.includes('0-10') ||
-            response.includes('rate the intensity')) {
-          console.log('[determineNextState] Transition: conversation → gathering-intensity');
+        if (response.includes('scale of 0') || response.includes('how intense') ||
+            response.includes('0-10') || response.includes('rate the intensity')) {
           return 'gathering-intensity';
         }
         break;
-        
       case 'gathering-intensity':
-        if (response.includes('tapping') || response.includes('visual guide') || response.includes('follow along') || response.includes('setup') || response.includes('karate chop')) {
-          console.log('[useAIChat] Detected setup/tapping transition, moving to setup');
-          return 'setup';
-        }
-        console.log('[useAIChat] ⚠️ Fallback: assuming transition to setup');
         return 'setup';
-
       case 'tapping-point':
-        if (currentTappingPoint < 7) {
-          console.log('[determineNextState] Continue tapping-point, current point:', currentTappingPoint);
-          return 'tapping-point';
-        } else {
-          console.log('[determineNextState] Transition: tapping-point → tapping-breathing');
-          return 'tapping-breathing';
-        }
-        
+        if (currentTappingPoint < 7) return 'tapping-point';
+        else return 'tapping-breathing';
       case 'tapping-breathing':
-        if (response.includes('how are you feeling') || 
-            response.includes('ready to rate') ||
-            response.includes('deep breath')) {
-          console.log('[determineNextState] Transition: tapping-breathing → post-tapping');
+        if (response.includes('how are you feeling') || response.includes('deep breath')) {
           return 'post-tapping';
         }
         break;
-        
-      case 'post-tapping':
-        // Check if intensity is still high
-        if (sessionContext.currentIntensity && sessionContext.currentIntensity > 3) {
-          console.log('[determineNextState] High intensity, restarting: post-tapping → tapping-point');
-          return 'tapping-point';
-        }
-        if (response.includes('amazing work') || 
-            response.includes('meditation library') ||
-            response.includes('well done')) {
-          console.log('[determineNextState] Transition: post-tapping → advice');
-          return 'advice';
-        }
-        break;
-        
       case 'advice':
-        console.log('[determineNextState] Transition: advice → complete');
         return 'complete';
     }
     
-    console.log('[determineNextState] No transition detected, staying in:', currentState);
     return null;
   };
 
@@ -825,9 +1043,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           setIntensityHistory([]);
           setCurrentTappingPoint(0);
           setCrisisDetected(false);
-          onStateChange('conversation');
           
-          // Add initial greeting
+          // Start with greeting-intensity state
+          onStateChange('greeting-intensity');
           createInitialGreeting(session.id);
         }
       }
@@ -850,6 +1068,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     startNewTappingRound,
     handlePostTappingIntensity,
     completeTappingSession,
-    handleTalkToTapaway
+    handleTalkToTapaway,
+    handleGreetingIntensity,
+    handleQuietIntegrationComplete,
+    handleSupportContacted
   };
 };
