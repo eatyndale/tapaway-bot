@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Play, Pause, SkipForward, Volume2, VolumeX } from "lucide-react";
 import eyebrowGif from "@/assets/tapping/eyebrow.gif";
@@ -15,7 +14,7 @@ import topHeadGif from "@/assets/tapping/top-head.gif";
 interface TappingPoint {
   name: string;
   key: string;
-  position: { x: number; y: number }; // Relative position for visual guide
+  position: { x: number; y: number };
   description: string;
   gifUrl: string;
 }
@@ -32,72 +31,40 @@ const tappingPoints: TappingPoint[] = [
 ];
 
 interface TappingGuideProps {
-  setupStatements: string[];  // the 3 setup statements
-  statementOrder: number[];   // length 8, values in {0,1,2}
-  aiReminderPhrases?: string[];  // AI-generated reminder phrases (8 total, one per point)
+  setupStatements: string[];
+  statementOrder: number[];
+  aiReminderPhrases?: string[];
   reminderPhraseType?: 'acknowledging' | 'partial-release' | 'full-release';
   feeling?: string;
   bodyLocation?: string;
-  problem?: string;  // problem context for fallback phrases
+  problem?: string;
   onComplete: () => void;
   onPointChange?: (pointIndex: number) => void;
 }
 
-// Convert adjective emotions to noun forms for grammatically correct statements
 const emotionToNoun: Record<string, string> = {
-  'anxious': 'anxiety',
-  'sad': 'sadness',
-  'stressed': 'stress',
-  'overwhelmed': 'overwhelm',
-  'tired': 'tiredness',
-  'exhausted': 'exhaustion',
-  'worried': 'worry',
-  'scared': 'fear',
-  'afraid': 'fear',
-  'frustrated': 'frustration',
-  'angry': 'anger',
-  'depressed': 'depression',
-  'nervous': 'nervousness',
-  'lonely': 'loneliness',
-  'hopeless': 'hopelessness',
-  'helpless': 'helplessness',
-  'panicked': 'panic',
-  'terrified': 'terror',
-  'disappointed': 'disappointment',
-  'guilty': 'guilt',
-  'ashamed': 'shame',
-  'embarrassed': 'embarrassment',
-  'jealous': 'jealousy',
-  'resentful': 'resentment',
-  'bitter': 'bitterness',
-  'insecure': 'insecurity',
-  'confused': 'confusion'
+  'anxious': 'anxiety', 'sad': 'sadness', 'stressed': 'stress', 'overwhelmed': 'overwhelm',
+  'tired': 'tiredness', 'exhausted': 'exhaustion', 'worried': 'worry', 'scared': 'fear',
+  'afraid': 'fear', 'frustrated': 'frustration', 'angry': 'anger', 'depressed': 'depression',
+  'nervous': 'nervousness', 'lonely': 'loneliness', 'hopeless': 'hopelessness',
+  'helpless': 'helplessness', 'panicked': 'panic', 'terrified': 'terror',
+  'disappointed': 'disappointment', 'guilty': 'guilt', 'ashamed': 'shame',
+  'embarrassed': 'embarrassment', 'jealous': 'jealousy', 'resentful': 'resentment',
+  'bitter': 'bitterness', 'insecure': 'insecurity', 'confused': 'confusion'
 };
 
-// Convert to noun form if needed
 const convertToNounForm = (emotion: string): string => {
   const lower = emotion.toLowerCase().trim();
-  if (emotionToNoun[lower]) {
-    return emotionToNoun[lower];
-  }
-  // If already ends with common noun suffixes, return as-is
+  if (emotionToNoun[lower]) return emotionToNoun[lower];
   if (lower.endsWith('ness') || lower.endsWith('tion') || lower.endsWith('ment') || 
-      lower.endsWith('ity') || lower.endsWith('ion')) {
-    return lower;
-  }
+      lower.endsWith('ity') || lower.endsWith('ion')) return lower;
   return emotion;
 };
 
-// Generate dynamic reminder phrases based on type (fallback when AI phrases not available)
-// Uses the new format: "[emotion] in my [body], [context], but I want to let it go."
 const generateReminderPhrase = (
   type: 'acknowledging' | 'partial-release' | 'full-release',
-  feeling: string,
-  bodyLocation: string,
-  pointIndex: number,
-  problem?: string
+  feeling: string, bodyLocation: string, pointIndex: number, problem?: string
 ): string => {
-  // Convert feeling to noun form for grammatically correct phrases
   const feelingNoun = convertToNounForm(feeling);
   const problemContext = problem || 'what happened';
   
@@ -106,46 +73,29 @@ const generateReminderPhrase = (
     `This ${feelingNoun} I'm holding, ${problemContext}, but I'm okay.`,
     `This ${feelingNoun} in my ${bodyLocation}, ${problemContext}, but I accept myself.`
   ];
-
   const partialReleasePhrases = [
     `This ${feelingNoun} in my ${bodyLocation}, ${problemContext}, but I'm choosing peace.`,
     `This ${feelingNoun} I'm feeling, ${problemContext}, and it's starting to shift.`,
     `This ${feelingNoun} in my ${bodyLocation}, ${problemContext}, but I'm choosing calm.`
   ];
-
   const fullReleasePhrases = [
     `This ${feelingNoun} in my ${bodyLocation}, ${problemContext}, I'm releasing this now.`,
     `This ${feelingNoun} I've been holding, ${problemContext}, I'm letting go.`
   ];
 
   let phrases: string[];
-  
-  // Select phrase set based on point index (8 points total)
-  // Points 0-2: acknowledging, Points 3-5: partial-release, Points 6-7: full-release
-  if (pointIndex < 3) {
-    phrases = acknowledgingPhrases;
-  } else if (pointIndex < 6) {
-    phrases = partialReleasePhrases;
-  } else {
-    phrases = fullReleasePhrases;
-  }
+  if (pointIndex < 3) phrases = acknowledgingPhrases;
+  else if (pointIndex < 6) phrases = partialReleasePhrases;
+  else phrases = fullReleasePhrases;
 
   return phrases[pointIndex % phrases.length];
 };
 
 const TappingGuide = ({ 
-  setupStatements, 
-  statementOrder, 
-  aiReminderPhrases,
-  reminderPhraseType = 'acknowledging',
-  feeling = 'this feeling',
-  bodyLocation = 'body',
-  problem,
-  onComplete, 
-  onPointChange 
+  setupStatements, statementOrder, aiReminderPhrases,
+  reminderPhraseType = 'acknowledging', feeling = 'this feeling',
+  bodyLocation = 'body', problem, onComplete, onPointChange 
 }: TappingGuideProps) => {
-  console.log('[TappingGuide] Rendered with:', { setupStatements, statementOrder, aiReminderPhrases, reminderPhraseType });
-  
   const [currentPoint, setCurrentPoint] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(15);
@@ -154,220 +104,155 @@ const TappingGuide = ({
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    
     if (isPlaying && timeRemaining > 0) {
-      interval = setInterval(() => {
-        setTimeRemaining(prev => prev - 1);
-      }, 1000);
+      interval = setInterval(() => setTimeRemaining(prev => prev - 1), 1000);
     } else if (timeRemaining === 0 && isPlaying) {
       handleNext();
     }
-
     return () => clearInterval(interval);
   }, [isPlaying, timeRemaining]);
 
-  useEffect(() => {
-    onPointChange?.(currentPoint);
-  }, [currentPoint, onPointChange]);
+  useEffect(() => { onPointChange?.(currentPoint); }, [currentPoint, onPointChange]);
 
-  // Pause audio when not playing
   useEffect(() => {
-    if (audioRef.current && !isPlaying) {
-      audioRef.current.pause();
-    }
+    if (audioRef.current && !isPlaying) audioRef.current.pause();
   }, [isPlaying]);
 
-  // Cleanup audio on unmount
   useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
-    };
+    return () => { if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; } };
   }, []);
 
   const handleNext = () => {
     if (currentPoint < tappingPoints.length - 1) {
       setCurrentPoint(prev => prev + 1);
       setTimeRemaining(15);
-      // Auto-start playing when moving to next point
       setIsPlaying(true);
-      if (audioRef.current) {
-        audioRef.current.play().catch((err) => {
-          console.error('[TappingGuide] Audio play failed:', err);
-        });
-      }
+      if (audioRef.current) audioRef.current.play().catch(() => {});
     } else {
       setIsPlaying(false);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
       onComplete();
     }
   };
 
   const handlePlay = () => {
     setIsPlaying(true);
-    // Play audio directly from click handler to satisfy browser autoplay policy
-    if (audioRef.current) {
-      audioRef.current.play().catch((err) => {
-        console.error('[TappingGuide] Audio play failed:', err);
-      });
-    }
+    if (audioRef.current) audioRef.current.play().catch(() => {});
   };
 
-  const handlePause = () => {
-    setIsPlaying(false);
-  };
+  const handlePause = () => { setIsPlaying(false); };
 
   const handleReset = () => {
-    setCurrentPoint(0);
-    setTimeRemaining(15);
-    setIsPlaying(false);
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
+    setCurrentPoint(0); setTimeRemaining(15); setIsPlaying(false);
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
   };
 
   const progress = ((currentPoint + (15 - timeRemaining) / 15) / tappingPoints.length) * 100;
   const currentTappingPoint = tappingPoints[currentPoint];
   
-  // Get the statement/phrase for the current point
-  // Priority: AI-generated reminder phrases > Setup statements > Fallback generated phrases
   let statementText: string;
-  
   if (aiReminderPhrases && aiReminderPhrases.length >= 8 && aiReminderPhrases[currentPoint]) {
-    // Use AI-generated reminder phrase (most natural language)
     statementText = aiReminderPhrases[currentPoint];
-    console.log('[TappingGuide] Using AI reminder phrase:', statementText);
   } else {
-    // Fallback to setup statements or generated phrases
     const statementIdx = statementOrder[currentPoint] ?? 0;
     const setupStatementText = setupStatements[statementIdx] || null;
-    
     if (setupStatementText) {
       statementText = setupStatementText;
     } else {
-      // Last resort: generate a phrase locally with problem context
       statementText = generateReminderPhrase(reminderPhraseType, feeling, bodyLocation, currentPoint, problem);
     }
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardContent className="p-3 sm:p-6 space-y-4 sm:space-y-6">
-        <audio
-          ref={audioRef}
-          src="/audio/ambient-tapping.mp3"
-          loop
-          preload="auto"
-          onCanPlayThrough={() => console.log('[TappingGuide] Audio ready to play')}
-          onError={(e) => console.error('[TappingGuide] Audio load error:', e)}
-        />
-        {/* Progress */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>Point {currentPoint + 1} of {tappingPoints.length}</span>
-            <span>{Math.round(progress)}% Complete</span>
+    <div className="w-full space-y-3 sm:space-y-5">
+      <audio ref={audioRef} src="/audio/ambient-tapping.mp3" loop preload="auto" />
+
+      <div className="space-y-1">
+        <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
+          <span>Point {currentPoint + 1} of {tappingPoints.length}</span>
+          <span>{Math.round(progress)}% Complete</span>
+        </div>
+        <Progress value={progress} className="h-2" />
+      </div>
+
+      <div className="relative bg-gradient-to-b from-primary/5 to-secondary/5 rounded-lg p-2 sm:p-6 flex items-center justify-center min-h-[180px] sm:min-h-[300px]">
+        <div className="relative w-full max-w-[200px] sm:max-w-sm mx-auto">
+          <img
+            key={currentPoint}
+            src={currentTappingPoint.gifUrl}
+            alt={`Tapping point: ${currentTappingPoint.name}`}
+            className="w-full h-auto rounded-lg shadow-lg animate-fade-in"
+          />
+          <div className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-background/90 px-2 py-1 sm:px-3 sm:py-2 rounded-full shadow-md">
+            <span className="text-xs sm:text-sm font-semibold text-foreground">
+              {currentPoint + 1}/{tappingPoints.length}
+            </span>
           </div>
-          <Progress value={progress} className="h-2" />
+        </div>
+      </div>
+
+      <div className="text-center space-y-3">
+        <div className="space-y-1">
+          <h3 className="text-base sm:text-xl font-bold text-foreground">
+            {currentTappingPoint.name}
+          </h3>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            {currentTappingPoint.description}
+          </p>
         </div>
 
-        {/* GIF Display */}
-        <div className="relative bg-gradient-to-b from-primary/5 to-secondary/5 rounded-lg p-4 sm:p-8 flex items-center justify-center min-h-[250px] sm:min-h-[400px]">
-          <div className="relative w-full max-w-sm sm:max-w-md">
-            <img 
-              key={currentPoint}
-              src={currentTappingPoint.gifUrl} 
-              alt={`Tapping point: ${currentTappingPoint.name}`}
-              className="w-full h-auto rounded-lg shadow-lg animate-fade-in"
-            />
-            
-            {/* Small progress indicator overlay */}
-            <div className="absolute top-4 right-4 bg-background/90 px-3 py-2 rounded-full shadow-md">
-              <span className="text-sm font-semibold text-foreground">
-                {currentPoint + 1}/{tappingPoints.length}
-              </span>
+        <div className="bg-card p-2 sm:p-4 rounded-lg border-2 border-primary/20">
+          <p className="text-sm sm:text-lg font-medium text-foreground">
+            Tap while saying:
+          </p>
+          <p className="text-primary font-semibold mt-1 text-sm sm:text-base">
+            "{statementText}"
+          </p>
+        </div>
+
+        {isPlaying && (
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-4 border-primary/20 flex items-center justify-center">
+              <span className="text-lg sm:text-xl font-bold text-primary">{timeRemaining}</span>
             </div>
+            <span className="text-xs sm:text-sm text-muted-foreground">seconds remaining</span>
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* Current Point Info */}
-        <div className="text-center space-y-4">
-          <div className="space-y-2">
-            <h3 className="text-xl font-bold text-gray-900">
-              {currentTappingPoint.name}
-            </h3>
-            <p className="text-sm text-gray-600">
-              {currentTappingPoint.description}
-            </p>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg border-2 border-primary/20">
-            <p className="text-lg font-medium text-gray-800">
-              Tap while saying:
-            </p>
-            <p className="text-primary font-semibold mt-1">
-              "{statementText}"
-            </p>
-          </div>
-
-          {/* Timer */}
-          {isPlaying && (
-            <div className="flex items-center justify-center space-x-2">
-              <div className="w-12 h-12 rounded-full border-4 border-primary/20 flex items-center justify-center">
-                <span className="text-lg font-bold text-primary">{timeRemaining}</span>
-              </div>
-              <span className="text-sm text-gray-600">seconds remaining</span>
-            </div>
-          )}
-        </div>
-
-        {/* Controls */}
-        <div className="flex flex-wrap justify-center gap-2 sm:space-x-3">
-          {!isPlaying ? (
-            <Button onClick={handlePlay} className="flex items-center space-x-2">
-              <Play className="w-4 h-4" />
-              <span>Start Tapping</span>
-            </Button>
-          ) : (
-            <Button onClick={handlePause} variant="outline" className="flex items-center space-x-2">
-              <Pause className="w-4 h-4" />
-              <span>Pause</span>
-            </Button>
-          )}
-          
-          <Button onClick={handleNext} variant="outline" className="flex items-center space-x-2">
-            <SkipForward className="w-4 h-4" />
-            <span>Next Point</span>
+      <div className="flex flex-wrap justify-center gap-2">
+        {!isPlaying ? (
+          <Button onClick={handlePlay} className="flex items-center space-x-2" size="sm">
+            <Play className="w-4 h-4" />
+            <span>Start Tapping</span>
           </Button>
-
-          <Button 
-            onClick={() => {
-              setIsMuted(!isMuted);
-              if (audioRef.current) {
-                audioRef.current.muted = !isMuted;
-              }
-            }} 
-            variant="ghost" 
-            size="icon"
-            className="text-gray-600"
-            title={isMuted ? "Unmute" : "Mute"}
-          >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+        ) : (
+          <Button onClick={handlePause} variant="outline" className="flex items-center space-x-2" size="sm">
+            <Pause className="w-4 h-4" />
+            <span>Pause</span>
           </Button>
+        )}
 
-          {currentPoint > 0 && (
-            <Button onClick={handleReset} variant="ghost" className="text-gray-600">
-              Reset
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        <Button onClick={handleNext} variant="outline" className="flex items-center space-x-2" size="sm">
+          <SkipForward className="w-4 h-4" />
+          <span>Next Point</span>
+        </Button>
+
+        <Button
+          onClick={() => { setIsMuted(!isMuted); if (audioRef.current) audioRef.current.muted = !isMuted; }}
+          variant="ghost" size="icon" className="text-muted-foreground h-8 w-8"
+          title={isMuted ? "Unmute" : "Mute"}
+        >
+          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+        </Button>
+
+        {currentPoint > 0 && (
+          <Button onClick={handleReset} variant="ghost" className="text-muted-foreground" size="sm">
+            Reset
+          </Button>
+        )}
+      </div>
+    </div>
   );
 };
 
