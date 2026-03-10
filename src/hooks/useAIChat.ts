@@ -557,6 +557,31 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           if (aiReminderPhrases) {
             (persistedContext as any).aiReminderPhrases = aiReminderPhrases;
           }
+          
+          // Create tapping session if transitioning to setup from conversation (Path A skip)
+          if (next === 'setup' && !persistedContext.tappingSessionId && persistedContext.problem && persistedContext.feeling && persistedContext.bodyLocation) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              const { profile } = await supabaseService.getProfile(user.id);
+              const initialIntensity = persistedContext.initialIntensity || persistedContext.currentIntensity || 5;
+              const { session: tappingSession } = await supabaseService.createTappingSession(user.id, {
+                problem: persistedContext.problem,
+                feeling: persistedContext.feeling,
+                body_location: persistedContext.bodyLocation,
+                initial_intensity: initialIntensity,
+                industry: profile?.industry || null,
+                age_group: profile?.age_group || null,
+                session_type: persistedContext.sessionType || 'traditional',
+                is_tearless_trauma: persistedContext.isTearlessTrauma || false,
+                peak_suds: persistedContext.peakSuds || initialIntensity
+              });
+              if (tappingSession) {
+                persistedContext.tappingSessionId = tappingSession.id;
+                persistedContext.round = 1;
+              }
+            }
+          }
+          
           setSessionContext(persistedContext);
           onSessionUpdate(persistedContext);
           
