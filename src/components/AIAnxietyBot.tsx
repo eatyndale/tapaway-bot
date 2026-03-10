@@ -365,9 +365,9 @@ const AIAnxietyBot = () => {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div 
+                <div 
                 ref={scrollContainerRef}
-                className="h-[500px] overflow-y-auto px-6 py-4"
+                className="h-[calc(100dvh-280px)] sm:h-[500px] overflow-y-auto px-3 sm:px-6 py-4"
               >
                 <div className="space-y-4">
                   {messages.map((message, index) => {
