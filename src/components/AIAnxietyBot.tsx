@@ -457,7 +457,7 @@ const AIAnxietyBot = () => {
           </Card>
         </div>
 
-        <div>
+        <div className="hidden lg:block">
           {showHistory ? (
             <ChatHistory 
               chatHistory={chatHistory}

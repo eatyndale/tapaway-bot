@@ -210,7 +210,7 @@ const Dashboard = ({ onSignOut }: DashboardProps) => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-2 py-4 sm:px-4 sm:py-8">
         {renderCurrentView()}
       </main>
     </div>
