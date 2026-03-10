@@ -191,7 +191,7 @@ const Dashboard = ({ onSignOut }: DashboardProps) => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex justify-between items-center">
           <div className="flex items-center space-x-3">
             <img 
               src="/lovable-uploads/2323e4a7-8630-4879-88a4-0b0c0be5aba7.png" 
@@ -210,7 +210,7 @@ const Dashboard = ({ onSignOut }: DashboardProps) => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-2 py-4 sm:px-4 sm:py-8">
         {renderCurrentView()}
       </main>
     </div>

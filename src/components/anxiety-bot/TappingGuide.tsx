@@ -258,7 +258,7 @@ const TappingGuide = ({
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
-      <CardContent className="p-6 space-y-6">
+      <CardContent className="p-3 sm:p-6 space-y-4 sm:space-y-6">
         <audio
           ref={audioRef}
           src="/audio/ambient-tapping.mp3"
@@ -277,8 +277,8 @@ const TappingGuide = ({
         </div>
 
         {/* GIF Display */}
-        <div className="relative bg-gradient-to-b from-primary/5 to-secondary/5 rounded-lg p-8 flex items-center justify-center min-h-[400px]">
-          <div className="relative w-full max-w-md">
+        <div className="relative bg-gradient-to-b from-primary/5 to-secondary/5 rounded-lg p-4 sm:p-8 flex items-center justify-center min-h-[250px] sm:min-h-[400px]">
+          <div className="relative w-full max-w-sm sm:max-w-md">
             <img 
               key={currentPoint}
               src={currentTappingPoint.gifUrl} 
@@ -327,7 +327,7 @@ const TappingGuide = ({
         </div>
 
         {/* Controls */}
-        <div className="flex justify-center space-x-3">
+        <div className="flex flex-wrap justify-center gap-2 sm:space-x-3">
           {!isPlaying ? (
             <Button onClick={handlePlay} className="flex items-center space-x-2">
               <Play className="w-4 h-4" />

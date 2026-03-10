@@ -92,7 +92,7 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
-      <CardContent className="p-6 space-y-6">
+      <CardContent className="p-3 sm:p-6 space-y-4 sm:space-y-6">
         <audio
           ref={audioRef}
           src="/audio/ambient-tapping.mp3"

@@ -6,7 +6,7 @@ const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 // Configure CORS and security headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'X-XSS-Protection': '1; mode=block',
@@ -613,41 +613,61 @@ serve(async (req) => {
     const hasAllRequiredData = sessionContext.problem && sessionContext.feeling && sessionContext.bodyLocation;
 
     if (sanitizedChatState === 'conversation' && hasAllRequiredData) {
-      console.log('[eft-chat] Auto-advancing: we have all data, moving to gathering-intensity');
+      console.log('[eft-chat] Auto-advancing: we have all data, skipping gathering-intensity, generating setup statements directly');
       
-      // Use AI to generate a natural, grammatically correct intensity gathering statement
       const capitalizedName = capitalizeName(sanitizedUserName);
       const feeling = sessionContext.feeling;
       const location = sessionContext.bodyLocation;
       const problem = sessionContext.problem;
+      const intensity = sessionContext.currentIntensity || sessionContext.initialIntensity || 5;
 
-      const intensityPrompt = `Generate a brief, natural acknowledgment for an EFT session.
+      // Generate setup statements via tool calling (same tool as gathering-intensity)
+      const setupToolDef = {
+        type: "function" as const,
+        function: {
+          name: "generate_tapping_directive",
+          description: "Generate the tapping directive with setup statements and reminder phrases for EFT therapy",
+          parameters: {
+            type: "object",
+            properties: {
+              setup_statements: {
+                type: "array",
+                items: { type: "string" },
+                description: "Array of exactly 3 varied EFT setup statements in the SHORT format: '[Emotion noun] in my [body], [problem context], but I want to let it go.' Example: 'This anxiety in my chest, I argued with John, but I want to let it go.'",
+                minItems: 3,
+                maxItems: 3
+              },
+              reminder_phrases: {
+                type: "array",
+                items: { type: "string" },
+                description: "Array of 8 reminder phrases for tapping points. Vary the endings: first 3 acknowledging, middle 3 partial-release, last 2 full-release.",
+                minItems: 8,
+                maxItems: 8
+              },
+              visible_response: {
+                type: "string",
+                description: "Short warm acknowledgment message to show the user (1-2 sentences) before starting tapping setup"
+              }
+            },
+            required: ["setup_statements", "reminder_phrases", "visible_response"]
+          }
+        }
+      };
 
-User: ${capitalizedName}
-Their problem: ${problem}
-Their feeling: ${feeling}
-Where they feel it: ${location}
+      const setupPrompt = `You are an EFT tapping therapist. Generate setup statements for ${capitalizedName}.
+Problem: ${problem}
+Feeling: ${feeling} (intensity: ${intensity}/10)
+Body location: ${location}
 
-Write ONE warm, grammatically correct sentence that:
-1. Acknowledges what they shared using natural phrasing
-2. Asks "How intense is that right now on a 0–10?"
+Generate 3 SHORT setup statements and 8 reminder phrases. Use the user's exact emotional language.
+Also write a warm 1-2 sentence acknowledgment that transitions to tapping (do NOT ask for intensity — we already have it).
 
 CRITICAL GRAMMAR RULES:
-- NEVER say "this disappointed" or "this anxious" - those are adjectives used as nouns (WRONG)
-- Use proper constructions like:
-  - "you're feeling disappointed about..." (adjective with "feeling")
-  - "this disappointment about..." (noun form)
-  - "the anxiety you're experiencing..." (noun with article)
-
-Examples of GOOD phrasing:
-- "I hear you, Duke — you're feeling disappointed about work stress, and it's sitting in your chest. How intense is that right now on a 0–10?"
-- "So there's this sadness about your boss's behavior, showing up in your stomach. How intense is that right now on a 0–10?"
-- "Got it — this overwhelm from work deadlines is weighing on your shoulders. How intense is that right now on a 0–10?"
-
-Keep it warm and conversational. One sentence max before the intensity question.`;
+- Use proper noun forms: anxious → anxiety, sad → sadness, stressed → stress
+- Format: "[Emotion noun] in my [body], [context], but I want to let it go."`;
 
       try {
-        const intensityGenResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        const toolResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${openAIApiKey}`,
@@ -656,52 +676,78 @@ Keep it warm and conversational. One sentence max before the intensity question.
           body: JSON.stringify({
             model: 'gpt-4o-mini',
             messages: [
-              { role: 'system', content: intensityPrompt }
+              { role: 'system', content: setupPrompt },
+              ...conversationHistory.slice(-10).map((msg: any) => ({
+                role: msg.type === 'user' ? 'user' : 'assistant',
+                content: msg.content
+              }))
             ],
+            tools: [setupToolDef],
+            tool_choice: { type: "function", function: { name: "generate_tapping_directive" } },
             temperature: 0.7,
-            max_tokens: 150,
+            max_tokens: 600,
           }),
         });
 
-        const intensityGenData = await intensityGenResponse.json();
-        let autoAdvanceResponse: string;
+        const toolData = await toolResponse.json();
         
-        if (intensityGenResponse.ok && intensityGenData.choices?.[0]?.message?.content) {
-          autoAdvanceResponse = intensityGenData.choices[0].message.content.trim();
-          console.log('[eft-chat] AI-generated intensity statement:', autoAdvanceResponse);
+        if (toolResponse.ok && toolData.choices?.[0]?.message?.tool_calls?.[0]) {
+          const toolArgs = JSON.parse(toolData.choices[0].message.tool_calls[0].function.arguments);
+          console.log('[eft-chat] Auto-advance setup statements generated:', JSON.stringify(toolArgs));
+          
+          const directive = {
+            next_state: 'setup',
+            tapping_point: 0,
+            setup_statements: toolArgs.setup_statements,
+            reminder_phrases: toolArgs.reminder_phrases || null,
+            statement_order: [0, 1, 2, 0, 1, 2, 1, 0],
+            say_index: 0
+          };
+          
+          const visibleResponse = toolArgs.visible_response || `Got it ${capitalizedName} — let's start tapping on this. Take a deep breath in... and out.`;
+          
+          return new Response(JSON.stringify({
+            response: `${visibleResponse}\n\n<<DIRECTIVE ${JSON.stringify(directive)}>>`,
+            crisisDetected: false,
+            extractedContext: {
+              problem: sessionContext.problem,
+              feeling: sessionContext.feeling,
+              bodyLocation: sessionContext.bodyLocation,
+              currentIntensity: intensity
+            }
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
         } else {
-          // Fallback to simple but grammatically correct template
-          const feelingNoun = convertToNoun(feeling);
-          autoAdvanceResponse = `Got it ${capitalizedName} — I hear you're dealing with ${feelingNoun} about ${problem}. How intense is that right now on a 0–10?`;
-          console.log('[eft-chat] Using fallback intensity statement');
+          throw new Error('Tool call failed');
         }
-        
-        return new Response(JSON.stringify({
-          response: `${autoAdvanceResponse}\n\n<<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>`,
-          crisisDetected: false,
-          extractedContext: {
-            problem: sessionContext.problem,
-            feeling: sessionContext.feeling,
-            bodyLocation: sessionContext.bodyLocation,
-            currentIntensity: sessionContext.currentIntensity
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
       } catch (error) {
-        console.error('[eft-chat] Error generating intensity statement:', error);
-        // Fallback
+        console.error('[eft-chat] Error generating setup statements during auto-advance:', error);
+        // Fallback: generate simple setup statements
         const feelingNoun = convertToNoun(feeling);
-        const autoAdvanceResponse = `Got it ${capitalizedName} — I hear you're dealing with ${feelingNoun} about ${problem}. How intense is that right now on a 0–10?`;
+        const fallbackStatements = [
+          `This ${feelingNoun} in my ${location}, ${problem}, but I deeply and completely accept myself.`,
+          `Even though I feel this ${feelingNoun} in my ${location}, I accept how I feel right now.`,
+          `This ${feelingNoun} in my ${location}, ${problem}, but I want to let it go.`
+        ];
+        const directive = {
+          next_state: 'setup',
+          tapping_point: 0,
+          setup_statements: fallbackStatements,
+          reminder_phrases: null,
+          statement_order: [0, 1, 2, 0, 1, 2, 1, 0],
+          say_index: 0
+        };
+        const fallbackResponse = `Got it ${capitalizedName} — let's start tapping on this ${feelingNoun}. Take a deep breath.`;
         
         return new Response(JSON.stringify({
-          response: `${autoAdvanceResponse}\n\n<<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>`,
+          response: `${fallbackResponse}\n\n<<DIRECTIVE ${JSON.stringify(directive)}>>`,
           crisisDetected: false,
           extractedContext: {
             problem: sessionContext.problem,
             feeling: sessionContext.feeling,
             bodyLocation: sessionContext.bodyLocation,
-            currentIntensity: sessionContext.currentIntensity
+            currentIntensity: intensity
           }
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

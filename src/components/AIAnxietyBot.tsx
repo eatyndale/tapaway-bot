@@ -330,7 +330,7 @@ const AIAnxietyBot = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto px-1 sm:px-0">
       <ChatHeader 
         questionnaireSession={questionnaireSession}
         chatState={chatState}
@@ -365,9 +365,9 @@ const AIAnxietyBot = () => {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div 
+                <div 
                 ref={scrollContainerRef}
-                className="h-[500px] overflow-y-auto px-6 py-4"
+                className="h-[calc(100dvh-280px)] sm:h-[500px] overflow-y-auto px-3 sm:px-6 py-4"
               >
                 <div className="space-y-4">
                   {messages.map((message, index) => {
@@ -457,7 +457,7 @@ const AIAnxietyBot = () => {
           </Card>
         </div>
 
-        <div>
+        <div className="hidden lg:block">
           {showHistory ? (
             <ChatHistory 
               chatHistory={chatHistory}
