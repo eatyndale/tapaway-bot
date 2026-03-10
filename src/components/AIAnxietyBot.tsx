@@ -330,7 +330,7 @@ const AIAnxietyBot = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto px-1 sm:px-0">
       <ChatHeader 
         questionnaireSession={questionnaireSession}
         chatState={chatState}
