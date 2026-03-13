@@ -29,6 +29,7 @@ const AIAnxietyBot = () => {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   
   const [chatState, setChatState] = useState<ChatState>(() => {
     const hasCompletedAssessment = localStorage.getItem('hasCompletedAssessment');
