@@ -12,13 +12,12 @@ interface SetupPhaseProps {
 
 const SECONDS_PER_STATEMENT = 15;
 
-const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
+const SetupPhase = ({ setupStatements, onComplete, audioRef }: SetupPhaseProps) => {
   const [currentStatement, setCurrentStatement] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(SECONDS_PER_STATEMENT);
   const [isMuted, setIsMuted] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
