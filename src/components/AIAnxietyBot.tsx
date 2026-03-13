@@ -265,6 +265,7 @@ const AIAnxietyBot = () => {
           problem={sessionContext.problem}
           onComplete={() => setChatState('tapping-breathing')}
           onPointChange={setCurrentTappingPoint}
+          audioRef={audioRef}
         />
       );
     }
