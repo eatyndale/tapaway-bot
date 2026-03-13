@@ -102,6 +102,12 @@ const TappingGuide = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
 
+  // Auto-start tapping on mount (user already interacted during setup phase)
+  useEffect(() => {
+    setIsPlaying(true);
+    if (audioRef.current) audioRef.current.play().catch(() => {});
+  }, []);
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isPlaying && timeRemaining > 0) {
