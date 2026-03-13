@@ -40,6 +40,7 @@ interface TappingGuideProps {
   problem?: string;
   onComplete: () => void;
   onPointChange?: (pointIndex: number) => void;
+  audioRef: React.RefObject<HTMLAudioElement>;
 }
 
 const emotionToNoun: Record<string, string> = {
