@@ -95,18 +95,16 @@ const generateReminderPhrase = (
 const TappingGuide = ({ 
   setupStatements, statementOrder, aiReminderPhrases,
   reminderPhraseType = 'acknowledging', feeling = 'this feeling',
-  bodyLocation = 'body', problem, onComplete, onPointChange 
+  bodyLocation = 'body', problem, onComplete, onPointChange, audioRef
 }: TappingGuideProps) => {
   const [currentPoint, setCurrentPoint] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(15);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
 
-  // Auto-start tapping on mount (user already interacted during setup phase)
+  // Auto-start timer on mount (audio already playing from setup phase)
   useEffect(() => {
     setIsPlaying(true);
-    if (audioRef.current) audioRef.current.play().catch(() => {});
   }, []);
 
   useEffect(() => {
