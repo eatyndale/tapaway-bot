@@ -865,28 +865,32 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     
     // SUDS 3-7: Check for deepening or show choices
     if (newIntensity >= 3) {
-      // If TTT and SUDS dropped to 3-7, could transition to traditional
+      // If TTT and SUDS dropped to 3-7, auto-transition to traditional conversation
       if (isTTT) {
-        // Show choice to either continue TTT or transition to talking
-        const choiceMessage: Message = {
-          id: `choice-${Date.now()}`,
-          type: 'system',
-          content: JSON.stringify({
-            type: 'post-tapping-choice',
-            intensity: newIntensity,
-            initialIntensity,
-            improvement,
-            round: sessionContext.round || 1,
-            roundsWithoutReduction,
-            highSudsRounds: 0,
-            isTearlessTrauma: true,
-            phraseType
-          }),
+        console.log('[useAIChat] TTT SUDS dropped below 8, auto-transitioning to conversation');
+        const updatedContext: SessionContext = {
+          ...sessionContext,
+          returningFromTapping: true,
+          deepeningLevel: (sessionContext.deepeningLevel || 0) + 1,
+          sessionType: 'mixed',
+          isTearlessTrauma: false,
+          problem: undefined,
+          feeling: undefined,
+          bodyLocation: undefined,
+        };
+        setSessionContext(updatedContext);
+        onSessionUpdate(updatedContext);
+
+        const transitionMessage: Message = {
+          id: `transition-${Date.now()}`,
+          type: 'bot',
+          content: `Your intensity has come down nicely. Let's explore what's going on so we can work through it more specifically. What's been on your mind? 💙`,
           timestamp: new Date(),
           sessionId: currentChatSession
         };
-        setMessages(prev => [...prev, choiceMessage]);
-        setConversationHistory(prev => [...prev, choiceMessage]);
+        setMessages(prev => [...prev, transitionMessage]);
+        setConversationHistory(prev => [...prev, transitionMessage]);
+        onStateChange('conversation');
         return;
       }
       
@@ -993,7 +997,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       returningFromTapping: true,
       deepeningLevel: (sessionContext.deepeningLevel || 0) + 1,
       sessionType: sessionContext.isTearlessTrauma ? 'mixed' : sessionContext.sessionType,
-      isTearlessTrauma: false // Switch to traditional for conversation
+      isTearlessTrauma: false,
+      problem: undefined,
+      feeling: undefined,
+      bodyLocation: undefined,
     };
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);
