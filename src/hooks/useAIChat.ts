@@ -997,7 +997,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       returningFromTapping: true,
       deepeningLevel: (sessionContext.deepeningLevel || 0) + 1,
       sessionType: sessionContext.isTearlessTrauma ? 'mixed' : sessionContext.sessionType,
-      isTearlessTrauma: false // Switch to traditional for conversation
+      isTearlessTrauma: false,
+      problem: undefined,
+      feeling: undefined,
+      bodyLocation: undefined,
     };
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);

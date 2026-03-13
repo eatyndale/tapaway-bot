@@ -227,15 +227,15 @@ const TappingGuide = ({
       </div>
 
       <div className="flex flex-wrap justify-center gap-2">
-        {!isPlaying ? (
-          <Button onClick={handlePlay} className="flex items-center space-x-2" size="sm">
-            <Play className="w-4 h-4" />
-            <span>Start Tapping</span>
-          </Button>
-        ) : (
+        {isPlaying ? (
           <Button onClick={handlePause} variant="outline" className="flex items-center space-x-2" size="sm">
             <Pause className="w-4 h-4" />
             <span>Pause</span>
+          </Button>
+        ) : (
+          <Button onClick={handlePlay} className="flex items-center space-x-2" size="sm">
+            <Play className="w-4 h-4" />
+            <span>Resume</span>
           </Button>
         )}
 

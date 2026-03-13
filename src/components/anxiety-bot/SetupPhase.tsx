@@ -42,6 +42,9 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
     if (currentStatement < setupStatements.length - 1) {
       setCurrentStatement(prev => prev + 1);
       setTimeRemaining(SECONDS_PER_STATEMENT);
+      if (!hasStarted) setHasStarted(true);
+      setIsPlaying(true);
+      if (audioRef.current) audioRef.current.play().catch(() => {});
     } else {
       setIsPlaying(false);
       if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
