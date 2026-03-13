@@ -171,7 +171,7 @@ const TappingGuide = ({
 
   return (
     <div className="w-full space-y-3 sm:space-y-5">
-      <audio ref={audioRef} src="/audio/ambient-tapping.mp3" loop preload="auto" />
+      <audio ref={audioRef} src="/audio/ambient-tapping.mp3" loop preload="auto" autoPlay />
 
       <div className="space-y-1">
         <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
