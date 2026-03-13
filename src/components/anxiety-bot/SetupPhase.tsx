@@ -29,14 +29,7 @@ const SetupPhase = ({ setupStatements, onComplete, audioRef }: SetupPhaseProps) 
     return () => clearInterval(interval);
   }, [isPlaying, timeRemaining]);
 
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
-    };
-  }, []);
+  // No cleanup - parent owns the audio element and it should keep playing into tapping phase
 
   const handleNext = () => {
     if (currentStatement < setupStatements.length - 1) {
