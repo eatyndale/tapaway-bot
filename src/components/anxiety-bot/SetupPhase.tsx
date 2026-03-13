@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
@@ -7,17 +7,17 @@ import setupMeditationImg from "@/assets/setup-meditation.gif";
 interface SetupPhaseProps {
   setupStatements: string[];
   onComplete: () => void;
+  audioRef: React.RefObject<HTMLAudioElement>;
 }
 
 const SECONDS_PER_STATEMENT = 15;
 
-const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
+const SetupPhase = ({ setupStatements, onComplete, audioRef }: SetupPhaseProps) => {
   const [currentStatement, setCurrentStatement] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(SECONDS_PER_STATEMENT);
   const [isMuted, setIsMuted] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -29,14 +29,7 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
     return () => clearInterval(interval);
   }, [isPlaying, timeRemaining]);
 
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
-    };
-  }, []);
+  // No cleanup - parent owns the audio element and it should keep playing into tapping phase
 
   const handleNext = () => {
     if (currentStatement < setupStatements.length - 1) {
@@ -77,7 +70,6 @@ const SetupPhase = ({ setupStatements, onComplete }: SetupPhaseProps) => {
 
   return (
     <div className="w-full space-y-3 sm:space-y-5">
-      <audio ref={audioRef} src="/audio/ambient-tapping.mp3" loop preload="auto" />
 
       <div className="text-center space-y-1">
         <h3 className="text-base sm:text-xl font-bold text-foreground">Setup Phase</h3>

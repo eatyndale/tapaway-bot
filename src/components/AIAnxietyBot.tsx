@@ -29,6 +29,7 @@ const AIAnxietyBot = () => {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   
   const [chatState, setChatState] = useState<ChatState>(() => {
     const hasCompletedAssessment = localStorage.getItem('hasCompletedAssessment');
@@ -217,6 +218,7 @@ const AIAnxietyBot = () => {
         <SetupPhase
           setupStatements={sessionContext.setupStatements}
           onComplete={() => setChatState('tapping-point')}
+          audioRef={audioRef}
         />
       );
     }
@@ -263,6 +265,7 @@ const AIAnxietyBot = () => {
           problem={sessionContext.problem}
           onComplete={() => setChatState('tapping-breathing')}
           onPointChange={setCurrentTappingPoint}
+          audioRef={audioRef}
         />
       );
     }
@@ -481,6 +484,8 @@ const AIAnxietyBot = () => {
           )}
         </div>
       </div>
+      
+      <audio ref={audioRef} src="/audio/ambient-tapping.mp3" loop preload="auto" />
       
       {showCrisisSupport && (
         <CrisisSupport 

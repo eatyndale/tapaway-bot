@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Play, Pause, SkipForward, Volume2, VolumeX } from "lucide-react";
@@ -40,6 +40,7 @@ interface TappingGuideProps {
   problem?: string;
   onComplete: () => void;
   onPointChange?: (pointIndex: number) => void;
+  audioRef: React.RefObject<HTMLAudioElement>;
 }
 
 const emotionToNoun: Record<string, string> = {
@@ -94,18 +95,16 @@ const generateReminderPhrase = (
 const TappingGuide = ({ 
   setupStatements, statementOrder, aiReminderPhrases,
   reminderPhraseType = 'acknowledging', feeling = 'this feeling',
-  bodyLocation = 'body', problem, onComplete, onPointChange 
+  bodyLocation = 'body', problem, onComplete, onPointChange, audioRef
 }: TappingGuideProps) => {
   const [currentPoint, setCurrentPoint] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(15);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
 
-  // Auto-start tapping on mount (user already interacted during setup phase)
+  // Auto-start timer on mount (audio already playing from setup phase)
   useEffect(() => {
     setIsPlaying(true);
-    if (audioRef.current) audioRef.current.play().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -124,9 +123,10 @@ const TappingGuide = ({
     if (audioRef.current && !isPlaying) audioRef.current.pause();
   }, [isPlaying]);
 
+  // Stop audio when tapping completes (unmount)
   useEffect(() => {
     return () => { if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; } };
-  }, []);
+  }, [audioRef]);
 
   const handleNext = () => {
     if (currentPoint < tappingPoints.length - 1) {
@@ -171,7 +171,6 @@ const TappingGuide = ({
 
   return (
     <div className="w-full space-y-3 sm:space-y-5">
-      <audio ref={audioRef} src="/audio/ambient-tapping.mp3" loop preload="auto" autoPlay />
 
       <div className="space-y-1">
         <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
