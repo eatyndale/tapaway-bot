@@ -485,6 +485,8 @@ const AIAnxietyBot = () => {
         </div>
       </div>
       
+      <audio ref={audioRef} src="/audio/ambient-tapping.mp3" loop preload="auto" />
+      
       {showCrisisSupport && (
         <CrisisSupport 
           onClose={() => setShowCrisisSupport(false)}

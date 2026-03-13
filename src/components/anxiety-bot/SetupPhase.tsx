@@ -70,7 +70,6 @@ const SetupPhase = ({ setupStatements, onComplete, audioRef }: SetupPhaseProps) 
 
   return (
     <div className="w-full space-y-3 sm:space-y-5">
-      <audio ref={audioRef} src="/audio/ambient-tapping.mp3" loop preload="auto" />
 
       <div className="text-center space-y-1">
         <h3 className="text-base sm:text-xl font-bold text-foreground">Setup Phase</h3>
