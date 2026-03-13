@@ -39,8 +39,6 @@ const SetupPhase = ({ setupStatements, onComplete, audioRef }: SetupPhaseProps) 
       setIsPlaying(true);
       if (audioRef.current) audioRef.current.play().catch(() => {});
     } else {
-      setIsPlaying(false);
-      if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
       onComplete();
     }
   };

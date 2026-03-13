@@ -98,14 +98,9 @@ const TappingGuide = ({
   bodyLocation = 'body', problem, onComplete, onPointChange, audioRef
 }: TappingGuideProps) => {
   const [currentPoint, setCurrentPoint] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState(15);
   const [isMuted, setIsMuted] = useState(false);
-
-  // Auto-start timer on mount (audio already playing from setup phase)
-  useEffect(() => {
-    setIsPlaying(true);
-  }, []);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
