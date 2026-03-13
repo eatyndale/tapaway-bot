@@ -7,6 +7,7 @@ import setupMeditationImg from "@/assets/setup-meditation.gif";
 interface SetupPhaseProps {
   setupStatements: string[];
   onComplete: () => void;
+  audioRef: React.RefObject<HTMLAudioElement>;
 }
 
 const SECONDS_PER_STATEMENT = 15;
