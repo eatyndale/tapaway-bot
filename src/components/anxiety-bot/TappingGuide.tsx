@@ -123,9 +123,10 @@ const TappingGuide = ({
     if (audioRef.current && !isPlaying) audioRef.current.pause();
   }, [isPlaying]);
 
+  // Stop audio when tapping completes (unmount)
   useEffect(() => {
     return () => { if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; } };
-  }, []);
+  }, [audioRef]);
 
   const handleNext = () => {
     if (currentPoint < tappingPoints.length - 1) {
