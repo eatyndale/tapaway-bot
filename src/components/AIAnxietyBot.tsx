@@ -218,6 +218,7 @@ const AIAnxietyBot = () => {
         <SetupPhase
           setupStatements={sessionContext.setupStatements}
           onComplete={() => setChatState('tapping-point')}
+          audioRef={audioRef}
         />
       );
     }
