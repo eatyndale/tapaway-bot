@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageCircle, RefreshCw, CheckCircle, AlertTriangle, Leaf, Phone } from "lucide-react";
+import { RefreshCw, CheckCircle, AlertTriangle, Leaf, Phone } from "lucide-react";
 
 interface PostTappingChoiceProps {
   intensity: number;
