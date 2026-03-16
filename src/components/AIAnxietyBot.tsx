@@ -388,8 +388,13 @@ const AIAnxietyBot = () => {
                               roundsWithoutReduction={parsed.roundsWithoutReduction}
                               highSudsRounds={parsed.highSudsRounds}
                               isTearlessTrauma={parsed.isTearlessTrauma}
-                              onContinueTapping={() => handleContinueTapping(parsed.intensity, parsed.phraseType)}
-                              onTalkToTapaway={handleTalkToTapaway}
+                              onContinueTapping={() => {
+                                if (parsed.intensity >= 1 && parsed.intensity <= 7) {
+                                  handleTalkToTapaway();
+                                } else {
+                                  handleContinueTapping(parsed.intensity, parsed.phraseType);
+                                }
+                              }}
                               onEndSession={handleEndSession}
                               onQuietIntegration={handleQuietIntegration}
                               onContactSupport={handleContactSupport}
