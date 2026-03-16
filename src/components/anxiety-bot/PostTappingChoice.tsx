@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageCircle, RefreshCw, CheckCircle, AlertTriangle, Leaf, Phone } from "lucide-react";
+import { RefreshCw, CheckCircle, AlertTriangle, Leaf, Phone } from "lucide-react";
 
 interface PostTappingChoiceProps {
   intensity: number;
@@ -10,7 +10,6 @@ interface PostTappingChoiceProps {
   highSudsRounds?: number;
   isTearlessTrauma?: boolean;
   onContinueTapping: () => void;
-  onTalkToTapaway: () => void;
   onEndSession: () => void;
   onQuietIntegration?: () => void;
   onContactSupport?: () => void;
@@ -24,7 +23,6 @@ const PostTappingChoice = ({
   highSudsRounds = 0,
   isTearlessTrauma = false,
   onContinueTapping,
-  onTalkToTapaway,
   onEndSession,
   onQuietIntegration,
   onContactSupport
@@ -154,15 +152,6 @@ const PostTappingChoice = ({
               <RefreshCw className="w-4 h-4" />
               Continue Tapping
             </Button>
-            <Button 
-              onClick={onTalkToTapaway}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <MessageCircle className="w-4 h-4" />
-              Talk to Tapaway
-            </Button>
             {roundsWithoutReduction >= 3 && (
               <Button 
                 onClick={onEndSession}
@@ -205,15 +194,6 @@ const PostTappingChoice = ({
           >
             <RefreshCw className="w-4 h-4" />
             Continue Tapping
-          </Button>
-          <Button 
-            onClick={onTalkToTapaway}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <MessageCircle className="w-4 h-4" />
-            Talk to Tapaway
           </Button>
           {onQuietIntegration && (
             <Button 
