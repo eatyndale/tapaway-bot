@@ -10,7 +10,6 @@ interface PostTappingChoiceProps {
   highSudsRounds?: number;
   isTearlessTrauma?: boolean;
   onContinueTapping: () => void;
-  onTalkToTapaway: () => void;
   onEndSession: () => void;
   onQuietIntegration?: () => void;
   onContactSupport?: () => void;
