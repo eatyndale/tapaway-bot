@@ -23,7 +23,6 @@ const PostTappingChoice = ({
   highSudsRounds = 0,
   isTearlessTrauma = false,
   onContinueTapping,
-  onTalkToTapaway,
   onEndSession,
   onQuietIntegration,
   onContactSupport
