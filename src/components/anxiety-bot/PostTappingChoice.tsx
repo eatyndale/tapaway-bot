@@ -152,15 +152,6 @@ const PostTappingChoice = ({
               <RefreshCw className="w-4 h-4" />
               Continue Tapping
             </Button>
-            <Button 
-              onClick={onTalkToTapaway}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <MessageCircle className="w-4 h-4" />
-              Talk to Tapaway
-            </Button>
             {roundsWithoutReduction >= 3 && (
               <Button 
                 onClick={onEndSession}
