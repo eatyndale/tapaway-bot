@@ -399,7 +399,6 @@ class SupabaseService {
     messages?: any[];
     crisis_detected?: boolean;
     crisis_resources?: any;
-    session_name?: string;
   }): Promise<{ session: ChatSession | null; error: any }> {
     const { data, error } = await supabase
       .from('chat_sessions')

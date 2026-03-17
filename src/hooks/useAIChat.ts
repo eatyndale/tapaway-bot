@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseService, UserProfile } from '@/services/supabaseService';
 import { ChatState, Message, SessionType } from '@/components/anxiety-bot/types';
@@ -115,6 +115,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
   const [currentTappingPoint, setCurrentTappingPoint] = useState(0);
   const [intensityHistory, setIntensityHistory] = useState<number[]>([]);
 
+  // Refs to allow persistMessages to always see latest values
+  const currentChatSessionRef = useRef<string | null>(null);
+  useEffect(() => { currentChatSessionRef.current = currentChatSession; }, [currentChatSession]);
+
   useEffect(() => {
     loadUserProfile();
   }, []);
@@ -136,6 +140,45 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       console.error('Error loading user profile:', error);
     }
   };
+
+  // ─── Centralized transcript persistence ───
+  // Call this after every setMessages / setConversationHistory update
+  // Pass the new messages array directly so we don't rely on stale state
+  const persistMessages = useCallback(async (msgs: Message[]) => {
+    const sid = currentChatSessionRef.current;
+    if (!sid) return;
+    try {
+      await supabaseService.updateChatSession(sid, { messages: msgs });
+    } catch (err) {
+      console.error('[persistMessages] failed:', err);
+    }
+  }, []);
+
+  // Helper: append messages to state AND persist
+  const appendAndPersist = useCallback(async (...newMsgs: Message[]) => {
+    let updated: Message[] = [];
+    setMessages(prev => {
+      updated = [...prev, ...newMsgs];
+      return updated;
+    });
+    setConversationHistory(prev => [...prev, ...newMsgs]);
+    // Allow React state to settle, then persist with the computed value
+    await persistMessages([...messages, ...newMsgs]);
+  }, [messages, persistMessages]);
+
+  // ─── Centralized round registration ───
+  // Called every time a new set of setup statements is generated
+  const registerNewRound = useCallback(async (
+    ctx: SessionContext,
+    newRoundNumber: number
+  ) => {
+    if (ctx.tappingSessionId) {
+      await supabaseService.updateTappingSession(ctx.tappingSessionId, {
+        rounds_completed: newRoundNumber,
+        final_intensity: ctx.currentIntensity ?? ctx.initialIntensity ?? 0
+      });
+    }
+  }, []);
 
   const initializeChatSession = async () => {
     try {
@@ -178,8 +221,11 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       timestamp: new Date(),
       sessionId: sessionId
     };
-    setMessages([greetingMessage]);
-    setConversationHistory([greetingMessage]);
+    const msgs = [greetingMessage];
+    setMessages(msgs);
+    setConversationHistory(msgs);
+    // Persist greeting
+    persistMessages(msgs);
   };
 
   // NEW: Handle the initial SUDS rating and branch to the correct path
@@ -196,7 +242,8 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       timestamp: new Date(),
       sessionId: currentChatSession || undefined
     };
-    setMessages(prev => [...prev, userMsg]);
+    const msgsAfterUser = [...messages, userMsg];
+    setMessages(msgsAfterUser);
     setConversationHistory(prev => [...prev, userMsg]);
     setIntensityHistory([intensity]);
 
@@ -211,8 +258,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         timestamp: new Date(),
         sessionId: currentChatSession || undefined
       };
-      setMessages(prev => [...prev, botMsg]);
+      const allMsgs = [...msgsAfterUser, botMsg];
+      setMessages(allMsgs);
       setConversationHistory(prev => [...prev, botMsg]);
+      await persistMessages(allMsgs);
       
       const ctx: SessionContext = {
         initialIntensity: 0,
@@ -239,8 +288,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         timestamp: new Date(),
         sessionId: currentChatSession || undefined
       };
-      setMessages(prev => [...prev, botMsg]);
+      const allMsgs = [...msgsAfterUser, botMsg];
+      setMessages(allMsgs);
       setConversationHistory(prev => [...prev, botMsg]);
+      await persistMessages(allMsgs);
       
       // Create tapping session with generic data
       const { data: { user } } = await supabase.auth.getUser();
@@ -282,6 +333,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       onSessionUpdate(ctx);
       setCurrentTappingPoint(0);
       
+      // Register round 1 for TTT
+      await registerNewRound(ctx, 1);
+      
       // Go directly to setup (karate chop)
       onStateChange('setup');
       return;
@@ -307,11 +361,13 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       timestamp: new Date(),
       sessionId: currentChatSession || undefined
     };
-    setMessages(prev => [...prev, botMsg]);
+    const allMsgs = [...msgsAfterUser, botMsg];
+    setMessages(allMsgs);
     setConversationHistory(prev => [...prev, botMsg]);
+    await persistMessages(allMsgs);
     
     onStateChange('conversation');
-  }, [currentChatSession, userProfile, onStateChange, onSessionUpdate]);
+  }, [currentChatSession, userProfile, messages, onStateChange, onSessionUpdate, persistMessages, registerNewRound]);
 
   // Handle Quiet Integration completion
   const handleQuietIntegrationComplete = useCallback(async (response: 'settled' | 'returned' | 'unsure') => {
@@ -333,8 +389,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         timestamp: new Date(),
         sessionId: currentChatSession || undefined
       };
-      setMessages(prev => [...prev, botMsg]);
+      const allMsgs = [...messages, botMsg];
+      setMessages(allMsgs);
       setConversationHistory(prev => [...prev, botMsg]);
+      await persistMessages(allMsgs);
       
       // If this was initial SUDS 0, go to advice
       if (sessionContext.initialIntensity === 0) {
@@ -365,8 +423,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         timestamp: new Date(),
         sessionId: currentChatSession || undefined
       };
-      setMessages(prev => [...prev, botMsg]);
+      const allMsgs = [...messages, botMsg];
+      setMessages(allMsgs);
       setConversationHistory(prev => [...prev, botMsg]);
+      await persistMessages(allMsgs);
       
       // If we have session data, start a new tapping round
       if (sessionContext.setupStatements && sessionContext.setupStatements.length > 0) {
@@ -384,12 +444,14 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         timestamp: new Date(),
         sessionId: currentChatSession || undefined
       };
-      setMessages(prev => [...prev, botMsg]);
+      const allMsgs = [...messages, botMsg];
+      setMessages(allMsgs);
       setConversationHistory(prev => [...prev, botMsg]);
+      await persistMessages(allMsgs);
       
       onStateChange('quiet-integration');
     }
-  }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate]);
+  }, [sessionContext, currentChatSession, messages, onStateChange, onSessionUpdate, persistMessages]);
 
   const sendMessage = useCallback(async (
     userMessage: string, 
@@ -441,7 +503,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         timestamp: new Date(),
         sessionId: currentChatSession
       };
-      setMessages(prev => [...prev, intensityMsg]);
+      const msgsWithIntensity = [...messages, intensityMsg];
+      setMessages(msgsWithIntensity);
+      await persistMessages(msgsWithIntensity);
       
       await handlePostTappingIntensity(additionalContext.currentIntensity);
       setIsLoading(false);
@@ -577,13 +641,19 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
               });
               if (tappingSession) {
                 persistedContext.tappingSessionId = tappingSession.id;
-                persistedContext.round = 1;
               }
             }
           }
+
+          // Register round 1 for traditional path (setup statements generated)
+          const newRound = (persistedContext.round || 0) + 1;
+          persistedContext.round = newRound;
           
           setSessionContext(persistedContext);
           onSessionUpdate(persistedContext);
+
+          // Persist round count
+          await registerNewRound(persistedContext, newRound);
           
           if (next === 'setup') {
             setCurrentTappingPoint(0);
@@ -603,8 +673,12 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           const setupStatements = extractSetupStatements(visibleContent);
           if (setupStatements.length > 0) {
             persistedContext.setupStatements = setupStatements;
+            // Register round for fallback path too
+            const newRound = (persistedContext.round || 0) + 1;
+            persistedContext.round = newRound;
             setSessionContext(persistedContext);
             onSessionUpdate(persistedContext);
+            await registerNewRound(persistedContext, newRound);
           }
         }
 
@@ -614,22 +688,14 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         }
       }
 
-      // Update chat session
-      let sessionName;
-      if (persistedContext.feeling || persistedContext.problem) {
-        sessionName = supabaseService.generateSessionName(
-          persistedContext.feeling || 'anxiety', 
-          persistedContext.problem
-        );
-      }
-      
-      await supabaseService.updateChatSession(currentChatSession, {
-        messages: finalMessages,
-        crisis_detected: data.crisisDetected || false,
-        session_name: sessionName
-      });
+      // Persist transcript
+      await persistMessages(finalMessages);
 
+      // Update crisis detection
       if (data.crisisDetected) {
+        await supabaseService.updateChatSession(currentChatSession, {
+          crisis_detected: true
+        });
         setCrisisDetected(true);
         onCrisisDetected?.();
         onStateChange('complete');
@@ -644,11 +710,13 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         timestamp: new Date(),
         sessionId: currentChatSession
       };
+      const errorMsgs = [...messages, errorMsg];
       setMessages(prev => [...prev, errorMsg]);
+      await persistMessages(errorMsgs);
     } finally {
       setIsLoading(false);
     }
-  }, [messages, userProfile, currentChatSession, sessionContext, conversationHistory, onStateChange, onSessionUpdate, onCrisisDetected]);
+  }, [messages, userProfile, currentChatSession, sessionContext, conversationHistory, onStateChange, onSessionUpdate, onCrisisDetected, persistMessages, registerNewRound]);
 
   const convertEmotionToNoun = (emotion: string): string => {
     const lower = emotion.toLowerCase().trim();
@@ -677,6 +745,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     const problem = sessionContext.problem || 'this issue';
     const isTTT = sessionContext.isTearlessTrauma;
     
+    // HIGH-SUDS SAFETY FALLBACK: If intensity is 8+ use vague tearless phrases
+    // regardless of whether the session started as traditional
+    const useVaguePhrases = isTTT || currentIntensity >= 8;
+    
     const determinedPhraseType = phraseType || (
       currentIntensity > 3 ? 'acknowledging' : 
       currentIntensity > 0 ? 'partial-release' : 
@@ -686,8 +758,8 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     let newSetupStatements: string[];
     let newReminderPhrases: string[] | undefined;
     
-    if (isTTT) {
-      // TTT: Use generic statements
+    if (useVaguePhrases) {
+      // TTT or high-SUDS safety: Use generic statements
       newSetupStatements = [
         "Even though I still have this intensity in my system, I'm allowing it to settle.",
         "This remaining activation, I choose to be present and calm.",
@@ -713,7 +785,24 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     }
     
     const statementOrder = [0, 1, 2, 0, 1, 2, 1, 0];
-    const newRound = (sessionContext.round || 1) + 1;
+    const newRound = (sessionContext.round || 0) + 1;
+    
+    // If escalating to 8+ from traditional, mark as mixed
+    let sessionType = sessionContext.sessionType;
+    let isTearlessTrauma = sessionContext.isTearlessTrauma;
+    if (currentIntensity >= 8 && !isTTT) {
+      sessionType = 'mixed';
+      isTearlessTrauma = true;
+    }
+    // If dropping below 8 and was in tearless, keep context but allow specific phrases
+    // when problem/feeling/bodyLocation context exists
+    if (currentIntensity < 8 && isTTT && sessionContext.problem && sessionContext.feeling && sessionContext.bodyLocation) {
+      // Only revert to specific if we have real context (not generic TTT placeholders)
+      const hasRealContext = sessionContext.problem !== 'High intensity activation';
+      if (hasRealContext) {
+        isTearlessTrauma = false;
+      }
+    }
     
     const updatedContext: SessionContext = {
       ...sessionContext,
@@ -726,7 +815,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       deepeningAttempts: sessionContext.deepeningAttempts || 0,
       isDeepening: false,
       // Update peak SUDS
-      peakSuds: Math.max(sessionContext.peakSuds || 0, currentIntensity)
+      peakSuds: Math.max(sessionContext.peakSuds || 0, currentIntensity),
+      sessionType,
+      isTearlessTrauma
     };
     
     if (newReminderPhrases) {
@@ -736,33 +827,31 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);
     
-    if (updatedContext.tappingSessionId) {
-      await supabaseService.updateTappingSession(updatedContext.tappingSessionId, {
-        rounds_completed: newRound,
-        final_intensity: currentIntensity
-      });
-    }
+    // Register the new round (setup statements generated = round counted)
+    await registerNewRound(updatedContext, newRound);
     
     setCurrentTappingPoint(0);
     
     const roundMessage: Message = {
       id: `round-${Date.now()}`,
       type: 'bot',
-      content: isTTT 
+      content: useVaguePhrases 
         ? `Let's do another gentle round. Take a deep breath...`
         : `Let's do another round of tapping to bring that ${feeling} down even more. Take a deep breath...`,
       timestamp: new Date(),
       sessionId: currentChatSession
     };
     
-    setMessages(prev => [...prev, roundMessage]);
+    const allMsgs = [...messages, roundMessage];
+    setMessages(allMsgs);
     setConversationHistory(prev => [...prev, roundMessage]);
+    await persistMessages(allMsgs);
     
     setTimeout(() => {
       onStateChange('setup');
     }, 0);
     
-  }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate]);
+  }, [sessionContext, currentChatSession, messages, onStateChange, onSessionUpdate, persistMessages, registerNewRound]);
 
   const completeTappingSession = useCallback(async (finalIntensity: number) => {
     if (sessionContext.tappingSessionId) {
@@ -858,8 +947,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         timestamp: new Date(),
         sessionId: currentChatSession
       };
-      setMessages(prev => [...prev, choiceMessage]);
+      const allMsgs = [...messages, choiceMessage];
+      setMessages(allMsgs);
       setConversationHistory(prev => [...prev, choiceMessage]);
+      await persistMessages(allMsgs);
       return;
     }
     
@@ -868,8 +959,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       // If TTT and SUDS dropped to 3-7, auto-transition to traditional conversation
       if (isTTT) {
         console.log('[useAIChat] TTT SUDS dropped below 8, auto-transitioning to conversation');
-        const updatedContext: SessionContext = {
+        const transitionContext: SessionContext = {
           ...sessionContext,
+          currentIntensity: newIntensity,
           returningFromTapping: true,
           deepeningLevel: (sessionContext.deepeningLevel || 0) + 1,
           sessionType: 'mixed',
@@ -878,8 +970,8 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           feeling: undefined,
           bodyLocation: undefined,
         };
-        setSessionContext(updatedContext);
-        onSessionUpdate(updatedContext);
+        setSessionContext(transitionContext);
+        onSessionUpdate(transitionContext);
 
         const transitionMessage: Message = {
           id: `transition-${Date.now()}`,
@@ -888,8 +980,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           timestamp: new Date(),
           sessionId: currentChatSession
         };
-        setMessages(prev => [...prev, transitionMessage]);
+        const allMsgs = [...messages, transitionMessage];
+        setMessages(allMsgs);
         setConversationHistory(prev => [...prev, transitionMessage]);
+        await persistMessages(allMsgs);
         onStateChange('conversation');
         return;
       }
@@ -918,8 +1012,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           timestamp: new Date(),
           sessionId: currentChatSession
         };
-        setMessages(prev => [...prev, choiceMessage]);
+        const allMsgs = [...messages, choiceMessage];
+        setMessages(allMsgs);
         setConversationHistory(prev => [...prev, choiceMessage]);
+        await persistMessages(allMsgs);
         return;
       }
       
@@ -960,8 +1056,10 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         timestamp: new Date(),
         sessionId: currentChatSession
       };
-      setMessages(prev => [...prev, choiceMessage]);
+      const allMsgs = [...messages, choiceMessage];
+      setMessages(allMsgs);
       setConversationHistory(prev => [...prev, choiceMessage]);
+      await persistMessages(allMsgs);
       return;
     }
     
@@ -983,10 +1081,12 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       timestamp: new Date(),
       sessionId: currentChatSession
     };
-    setMessages(prev => [...prev, choiceMessage]);
+    const allMsgs = [...messages, choiceMessage];
+    setMessages(allMsgs);
     setConversationHistory(prev => [...prev, choiceMessage]);
+    await persistMessages(allMsgs);
     
-  }, [sessionContext, currentChatSession, messages, onStateChange, sendMessage, completeTappingSession, onSessionUpdate]);
+  }, [sessionContext, currentChatSession, messages, onStateChange, sendMessage, completeTappingSession, onSessionUpdate, persistMessages]);
 
   const handleTalkToTapaway = useCallback(async () => {
     console.log('[useAIChat] User chose to talk to Tapaway');
@@ -1013,11 +1113,13 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       sessionId: currentChatSession
     };
     
-    setMessages(prev => [...prev, transitionMessage]);
+    const allMsgs = [...messages, transitionMessage];
+    setMessages(allMsgs);
     setConversationHistory(prev => [...prev, transitionMessage]);
+    await persistMessages(allMsgs);
     
     onStateChange('conversation');
-  }, [sessionContext, currentChatSession, onStateChange, onSessionUpdate]);
+  }, [sessionContext, currentChatSession, messages, onStateChange, onSessionUpdate, persistMessages]);
 
   // Track support contact
   const handleSupportContacted = useCallback(async () => {
