@@ -1,18 +1,29 @@
 
 
-## Fix: Invalid Capacitor App ID
+## Make the Android App Load Local Assets (Production Mode)
 
-The current `appId` (`app.lovable.06fba0130ca242c8b6694adcf9e55711`) is invalid because segments can't start with numbers.
+### Problem
+The `capacitor.config.ts` has a `server.url` that points to the remote Lovable preview, so the app always loads from the internet like a browser. This is development mode.
 
-### Change
-In `capacitor.config.ts`, update `appId` from:
-```
-app.lovable.06fba0130ca242c8b6694adcf9e55711
-```
-to:
-```
-app.lovable.tapaway
-```
+### Plan
 
-This is a one-line change in `capacitor.config.ts`.
+**Step 1: Update `capacitor.config.ts`**
+- Remove (or comment out) the `server` block so Capacitor loads from the local `dist/` assets bundled into the APK.
+
+**Step 2: User runs locally**
+After the change, the user needs to:
+```bash
+git pull
+npm install
+npm run build
+npx cap copy android
+npx cap sync android
+```
+Then click **Run ▶** in Android Studio.
+
+### Result
+The app will load from bundled local files — works offline, loads faster, and behaves like a true native app. The remote `server` config can be re-added anytime for development/hot-reload.
+
+### Technical Detail
+The only file changed is `capacitor.config.ts` — the `server` property is removed. Everything else stays the same.
 
