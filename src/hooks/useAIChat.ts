@@ -1226,6 +1226,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       problem: undefined,
       feeling: undefined,
       bodyLocation: undefined,
+      loopRounds: 0, // Reset loop on conversation re-entry
     };
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);
@@ -1245,6 +1246,59 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     
     onStateChange('conversation');
   }, [sessionContext, currentChatSession, messages, onStateChange, onSessionUpdate, persistMessages]);
+
+  // Body-based continue tapping (protective cognition) for high-SUDS stagnation
+  const handleBodyBasedContinue = useCallback(async (currentIntensity: number) => {
+    console.log('[useAIChat] Body-based continue with protective cognition, intensity:', currentIntensity);
+    
+    const newRound = (sessionContext.round || 0) + 1;
+    const updatedContext: SessionContext = {
+      ...sessionContext,
+      currentIntensity,
+      round: newRound,
+      setupStatements: PROTECTIVE_COGNITION_SETUP,
+      aiReminderPhrases: PROTECTIVE_COGNITION_REMINDERS,
+      statementOrder: [0, 1, 2, 0, 1, 2, 1, 0],
+      reminderPhraseType: 'acknowledging',
+      bodyBasedRoundDone: true,
+      loopRounds: 0, // Reset loop
+      peakSuds: Math.max(sessionContext.peakSuds || 0, currentIntensity),
+    };
+    setSessionContext(updatedContext);
+    onSessionUpdate(updatedContext);
+    
+    await registerNewRound(updatedContext, newRound);
+    setCurrentTappingPoint(0);
+    
+    const roundMessage: Message = {
+      id: `round-${Date.now()}`,
+      type: 'bot',
+      content: `Let's try something different. Instead of focusing on the story, let's focus on where you feel this in your body. You're safe right now. Take a deep breath... 💙`,
+      timestamp: new Date(),
+      sessionId: currentChatSession
+    };
+    const allMsgs = [...messages, roundMessage];
+    setMessages(allMsgs);
+    setConversationHistory(prev => [...prev, roundMessage]);
+    await persistMessages(allMsgs);
+    
+    setTimeout(() => {
+      onStateChange('setup');
+    }, 0);
+  }, [sessionContext, currentChatSession, messages, onStateChange, onSessionUpdate, persistMessages, registerNewRound]);
+
+  // Handle fatigue check responses
+  const handleFatigueContinue = useCallback(async (intensity: number, phraseType?: 'acknowledging' | 'partial-release' | 'full-release') => {
+    console.log('[useAIChat] Fatigue continue - resetting loop');
+    setSessionContext(prev => ({ ...prev, loopRounds: 0 }));
+    await startNewTappingRound(intensity, phraseType);
+  }, [startNewTappingRound]);
+
+  const handleFatiguePause = useCallback(async () => {
+    console.log('[useAIChat] Fatigue pause - going to quiet integration');
+    setSessionContext(prev => ({ ...prev, loopRounds: 0 }));
+    onStateChange('quiet-integration');
+  }, [onStateChange]);
 
   // Track support contact
   const handleSupportContacted = useCallback(async () => {
