@@ -13,6 +13,7 @@ import IntensitySlider from "./anxiety-bot/IntensitySlider";
 import TappingGuide from "./anxiety-bot/TappingGuide";
 import SetupPhase from "./anxiety-bot/SetupPhase";
 import PostTappingChoice from "./anxiety-bot/PostTappingChoice";
+import FatigueCheck from "./anxiety-bot/FatigueCheck";
 import CrisisSupport from "./anxiety-bot/CrisisSupport";
 import ChatMessage from "./anxiety-bot/ChatMessage";
 import LoadingIndicator from "./anxiety-bot/LoadingIndicator";
@@ -61,7 +62,10 @@ const AIAnxietyBot = () => {
     handleTalkToTapaway,
     handleGreetingIntensity,
     handleQuietIntegrationComplete,
-    handleSupportContacted
+    handleSupportContacted,
+    handleBodyBasedContinue,
+    handleFatigueContinue,
+    handleFatiguePause
   } = useAIChat({
     onStateChange: (newState) => {
       console.log('State change:', chatState, '->', newState);
@@ -388,6 +392,7 @@ const AIAnxietyBot = () => {
                               roundsWithoutReduction={parsed.roundsWithoutReduction}
                               highSudsRounds={parsed.highSudsRounds}
                               isTearlessTrauma={parsed.isTearlessTrauma}
+                              postBodyBased={parsed.postBodyBased}
                               onContinueTapping={() => {
                                 if (parsed.intensity >= 1 && parsed.intensity <= 7) {
                                   handleTalkToTapaway();
@@ -395,9 +400,23 @@ const AIAnxietyBot = () => {
                                   handleContinueTapping(parsed.intensity, parsed.phraseType);
                                 }
                               }}
+                              onBodyBasedContinue={() => handleBodyBasedContinue(parsed.intensity)}
                               onEndSession={handleEndSession}
                               onQuietIntegration={handleQuietIntegration}
                               onContactSupport={handleContactSupport}
+                            />
+                          );
+                        }
+                        
+                        if (parsed.type === 'fatigue-check') {
+                          return (
+                            <FatigueCheck
+                              key={message.id}
+                              round={parsed.round}
+                              intensity={parsed.intensity}
+                              onContinue={() => handleFatigueContinue(parsed.intensity, parsed.phraseType)}
+                              onPause={handleFatiguePause}
+                              onEnd={handleEndSession}
                             />
                           );
                         }

@@ -54,6 +54,8 @@ export interface ChatSession {
   quietIntegrationUsed?: boolean;
   sessionType?: SessionType;
   highSudsRounds?: number; // Tracks consecutive rounds at SUDS 8-10
+  bodyBasedRoundDone?: boolean; // Tracks if protective cognition round was done (SUDS 8-10 stagnation)
+  loopRounds?: number; // Consecutive rounds without pause (resets at 6 for fatigue check)
 }
 
 export interface Message {

@@ -1106,10 +1106,11 @@ The tapping session is complete. Generate personalized therapeutic advice based 
 - They felt it in: ${bodyLoc}
 - Initial intensity: ${initialIntensity}/10
 - Final intensity: ${finalIntensity}/10
-- Improvement: ${improvementPct}%
 - Rounds completed: ${sessionContext.round || 1}
 - Deepening conversations: ${deepeningCount}
 ${hitStrikeLimit ? '- NOTE: They reached the 3-round limit without significant reduction' : ''}
+
+**CRITICAL: Do NOT mention any percentage or numeric improvement in your response. Focus on the qualitative shift.**
 
 **Format Requirements (CRITICAL - follow exactly):**
 
@@ -1122,12 +1123,10 @@ ${hitStrikeLimit ? '- NOTE: They reached the 3-round limit without significant r
    - Each bullet should start with "- " (dash space)
    - NO emojis in the bullets
    - Make suggestions specific to their situation (${problemDesc})
-   - Include practical, evidence-based coping strategies
 
 3. **Closing line:**
    - End with ONE warm, encouraging sentence
    - This is the ONLY place for an emoji (use 💚 at the end)
-   - Example: "I'm here whenever you need me. 💚"
 
 ${hitStrikeLimit ? `
 **SPECIAL CONTEXT: They did the work but intensity stayed high**
@@ -1152,6 +1151,23 @@ ${hitStrikeLimit ? `
 - Suggest alternative approaches or professional support
 `}
 
+**ACTION RECOMMENDATIONS (based on final SUDS ${finalIntensity}/10):**
+${finalIntensity <= 3 ? `
+- Focus on positive reinforcement and gentle close
+- Suggest optional reframing tapping for maintenance
+- Encourage journaling and building on this success
+` : finalIntensity <= 6 ? `
+- Suggest rest and integration — their body has been doing important work
+- Encourage returning for another session later
+- Recommend gentle self-care activities
+` : `
+- PRIORITISE grounding techniques (feet on floor, 5 senses exercise)
+- Recommend slow breathing exercises (4 counts in, 6 counts out)
+- Suggest contacting a trusted person
+- Include support line info: 988 (call/text) or text HOME to 741741
+- Consider working with an EFT practitioner
+`}
+
 ${isTTTSession ? `
 **SPECIAL CONTEXT: Tearless Trauma Therapy Session**
 - This was a high-distress session where we used gentle, non-probing tapping
@@ -1172,7 +1188,6 @@ Try this next:
 - Take a few deep breaths when you notice tension in your ${bodyLoc}
 - [More specific suggestions based on their ${problemDesc}...]
 - Consider journaling about what came up today
-- Reach out to someone you trust if you need support
 
 I'm here whenever you need me. 💚
 

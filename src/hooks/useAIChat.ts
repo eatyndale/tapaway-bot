@@ -34,6 +34,8 @@ interface SessionContext {
   quietIntegrationUsed?: boolean;
   sessionType?: SessionType;
   highSudsRounds?: number;
+  bodyBasedRoundDone?: boolean;
+  loopRounds?: number;
 }
 
 interface Directive {
@@ -102,6 +104,24 @@ const TEARLESS_REMINDER_PHRASES = [
   "I don't need to name it, I'm just allowing it to move.",
   "This intensity, and I'm choosing peace.",
   "Whatever this is, I'm letting it settle."
+];
+
+// Protective cognition setup statements (for high-SUDS body-based tapping)
+const PROTECTIVE_COGNITION_SETUP = [
+  "Even though this feels really intense, I'm safe right now.",
+  "Even though this is a lot, I don't have to deal with it all at once.",
+  "Even though my body is holding so much, I choose to stay present."
+];
+
+const PROTECTIVE_COGNITION_REMINDERS = [
+  "This intensity in my body...",
+  "I notice where I feel it...",
+  "I'm safe in this moment...",
+  "Letting my body soften...",
+  "I don't have to fix it all now...",
+  "My body knows how to settle...",
+  "I'm present and I'm okay...",
+  "Allowing this to move through me..."
 ];
 
 export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, onTypoCorrection }: UseAIChatProps) => {
@@ -871,7 +891,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     }
   }, [sessionContext]);
 
-  // REVISED: Post-tapping decision tree
+  // REVISED: Post-tapping decision tree with stagnation redesign + fatigue check
   const handlePostTappingIntensity = useCallback(async (newIntensity: number) => {
     console.log('[useAIChat] Post-tapping intensity:', newIntensity, 'TTT:', sessionContext.isTearlessTrauma);
     
@@ -895,6 +915,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     // Update peak SUDS
     const peakSuds = Math.max(sessionContext.peakSuds || 0, newIntensity);
     
+    // Increment loop rounds (fatigue counter)
+    const loopRounds = (sessionContext.loopRounds || 0) + 1;
+    
     // Determine reminder phrase type
     let phraseType: 'acknowledging' | 'partial-release' | 'full-release';
     if (newIntensity > 3) {
@@ -912,12 +935,20 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       highSudsRounds,
       peakSuds,
       reminderPhraseType: phraseType,
-      previousIntensities: [...(sessionContext.previousIntensities || []), newIntensity]
+      previousIntensities: [...(sessionContext.previousIntensities || []), newIntensity],
+      loopRounds
     };
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);
     
-    // SUDS 0: Auto-complete → advice
+    // ═══ DECISION PRIORITY ═══
+    // 1. SUDS === 0 → auto-complete
+    // 2. SUDS 8-10 → Change 1 high-SUDS stagnation (overrides fatigue)
+    // 3. SUDS 3-7 + 3 rounds no reduction → Change 1 specificity re-entry (overrides fatigue)
+    // 4. loopRounds >= 6 → Change 3 fatigue check
+    // 5. Normal flow
+    
+    // ═══ 1. SUDS 0: Auto-complete → advice ═══
     if (newIntensity === 0) {
       console.log('[useAIChat] SUDS 0 - auto-complete');
       await completeTappingSession(0);
@@ -925,16 +956,46 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       await sendMessage(
         `My intensity is now 0/10. Initial was ${initialIntensity}/10.`,
         'advice',
-        { currentIntensity: 0 }
+        { currentIntensity: 0, loopRounds: 0 }
       );
       return;
     }
     
-    // SUDS 8-10: Grounding → auto-repeat. After 3 rounds at 8-10, show End + Contact Support
+    // ═══ 2. SUDS 8-10: High-SUDS stagnation logic ═══
     if (newIntensity >= 8) {
-      console.log('[useAIChat] SUDS 8-10, highSudsRounds:', highSudsRounds);
+      console.log('[useAIChat] SUDS 8-10, highSudsRounds:', highSudsRounds, 'bodyBasedRoundDone:', sessionContext.bodyBasedRoundDone);
       
-      // Show choice UI (PostTappingChoice handles grounding vs support based on highSudsRounds)
+      // After body-based round AND still 8-10 → force exit options only
+      if (sessionContext.bodyBasedRoundDone && highSudsRounds >= 3) {
+        console.log('[useAIChat] Post body-based round still 8-10 → final exit options');
+        const choiceMessage: Message = {
+          id: `choice-${Date.now()}`,
+          type: 'system',
+          content: JSON.stringify({
+            type: 'post-tapping-choice',
+            intensity: newIntensity,
+            initialIntensity,
+            improvement,
+            round: sessionContext.round || 1,
+            roundsWithoutReduction,
+            highSudsRounds,
+            isTearlessTrauma: isTTT,
+            phraseType,
+            postBodyBased: true // Signal: show only exit options
+          }),
+          timestamp: new Date(),
+          sessionId: currentChatSession
+        };
+        const allMsgs = [...messages, choiceMessage];
+        setMessages(allMsgs);
+        setConversationHistory(prev => [...prev, choiceMessage]);
+        await persistMessages(allMsgs);
+        // Reset loop rounds since stagnation overrides
+        setSessionContext(prev => ({ ...prev, loopRounds: 0 }));
+        return;
+      }
+      
+      // Show choice UI (3-option card after 3 rounds, or grounding + auto-repeat before)
       const choiceMessage: Message = {
         id: `choice-${Date.now()}`,
         type: 'system',
@@ -947,7 +1008,8 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           roundsWithoutReduction,
           highSudsRounds,
           isTearlessTrauma: isTTT,
-          phraseType
+          phraseType,
+          postBodyBased: false
         }),
         timestamp: new Date(),
         sessionId: currentChatSession
@@ -956,17 +1018,18 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       setMessages(allMsgs);
       setConversationHistory(prev => [...prev, choiceMessage]);
       await persistMessages(allMsgs);
+      // Reset loop rounds since high-SUDS overrides fatigue
+      setSessionContext(prev => ({ ...prev, loopRounds: 0 }));
       return;
     }
     
-    // SUDS 3-7: Check for deepening or show choices
+    // ═══ 3. SUDS 3-7: Check stagnation first ═══
     if (newIntensity >= 3) {
       // If TTT and SUDS dropped to 3-7, auto-transition to traditional conversation
       if (isTTT) {
         console.log('[useAIChat] TTT SUDS dropped below 8, auto-transitioning to conversation');
         const transitionContext: SessionContext = {
-          ...sessionContext,
-          currentIntensity: newIntensity,
+          ...updatedContext,
           returningFromTapping: true,
           deepeningLevel: (sessionContext.deepeningLevel || 0) + 1,
           sessionType: 'mixed',
@@ -974,6 +1037,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
           problem: undefined,
           feeling: undefined,
           bodyLocation: undefined,
+          loopRounds: 0, // Reset on transition
         };
         setSessionContext(transitionContext);
         onSessionUpdate(transitionContext);
@@ -993,44 +1057,52 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         return;
       }
       
-      // Traditional path: auto-deepening if stuck
-      const totalRoundsWithoutReduction = newIntensity >= 5 
+      // Track total rounds without reduction for SUDS 3-7
+      const totalRoundsWithoutReduction = noReduction 
         ? (sessionContext.totalRoundsWithoutReduction || 0) + 1
         : 0;
       
+      // ═══ CHANGE 1: SUDS 3-7 + 3 rounds no reduction → auto re-enter conversation with specificity ═══
       if (totalRoundsWithoutReduction >= 3) {
-        // 3-strike: offer Quiet Integration instead of just ending
-        console.log('[useAIChat] 3-strike limit - offering quiet integration');
-        const choiceMessage: Message = {
-          id: `choice-${Date.now()}`,
-          type: 'system',
-          content: JSON.stringify({
-            type: 'post-tapping-choice',
-            intensity: newIntensity,
-            initialIntensity,
-            improvement,
-            round: sessionContext.round || 1,
-            roundsWithoutReduction: 3,
-            highSudsRounds: 0,
-            phraseType
-          }),
+        console.log('[useAIChat] SUDS 3-7 stagnation → specificity re-entry to conversation');
+        
+        const feeling = sessionContext.feeling || 'this feeling';
+        const problem = sessionContext.problem || 'what you\'re going through';
+        
+        const specificityContext: SessionContext = {
+          ...updatedContext,
+          returningFromTapping: true,
+          deepeningLevel: (sessionContext.deepeningLevel || 0) + 1,
+          totalRoundsWithoutReduction: 0, // Reset
+          roundsWithoutReduction: 0,
+          loopRounds: 0, // Reset on stagnation path
+        };
+        setSessionContext(specificityContext);
+        onSessionUpdate(specificityContext);
+        
+        const specificityMessage: Message = {
+          id: `specificity-${Date.now()}`,
+          type: 'bot',
+          content: `We've done a few rounds and your intensity is holding steady. That usually means we need to get more specific about what's driving this. 💙\n\nCan you tell me a little bit more about this ${feeling}? What specifically about ${problem} is bothering you the most?`,
           timestamp: new Date(),
           sessionId: currentChatSession
         };
-        const allMsgs = [...messages, choiceMessage];
+        const allMsgs = [...messages, specificityMessage];
         setMessages(allMsgs);
-        setConversationHistory(prev => [...prev, choiceMessage]);
+        setConversationHistory(prev => [...prev, specificityMessage]);
         await persistMessages(allMsgs);
+        onStateChange('conversation');
         return;
       }
       
+      // Auto-deepening for SUDS 5-7 after 1 round without reduction
       if (newIntensity >= 5 && totalRoundsWithoutReduction >= 1) {
-        // Auto-deepening
         const deepeningContext = {
           ...updatedContext,
           isDeepening: true,
           deepeningAttempts: 0,
-          totalRoundsWithoutReduction
+          totalRoundsWithoutReduction,
+          loopRounds: 0, // Reset on deepening
         };
         setSessionContext(deepeningContext);
         onSessionUpdate(deepeningContext);
@@ -1044,7 +1116,31 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         return;
       }
       
-      // Show standard choices
+      // ═══ 4. FATIGUE CHECK: loopRounds >= 6 (only if stagnation didn't trigger) ═══
+      if (loopRounds >= 6) {
+        console.log('[useAIChat] Fatigue check triggered at loopRounds:', loopRounds);
+        const fatigueMessage: Message = {
+          id: `fatigue-${Date.now()}`,
+          type: 'system',
+          content: JSON.stringify({
+            type: 'fatigue-check',
+            intensity: newIntensity,
+            initialIntensity,
+            round: sessionContext.round || 1,
+            loopRounds,
+            phraseType
+          }),
+          timestamp: new Date(),
+          sessionId: currentChatSession
+        };
+        const allMsgs = [...messages, fatigueMessage];
+        setMessages(allMsgs);
+        setConversationHistory(prev => [...prev, fatigueMessage]);
+        await persistMessages(allMsgs);
+        return;
+      }
+      
+      // ═══ 5. Normal SUDS 3-7 choices ═══
       const choiceMessage: Message = {
         id: `choice-${Date.now()}`,
         type: 'system',
@@ -1068,8 +1164,32 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       return;
     }
     
-    // SUDS 1-2: Show 4-button choice (Continue, Chat, Quiet Integration, End)
-    console.log('[useAIChat] SUDS 1-2 - showing 4 choices');
+    // ═══ SUDS 1-2: Fatigue check first, then normal 4-button choice ═══
+    if (loopRounds >= 6) {
+      console.log('[useAIChat] Fatigue check triggered at SUDS 1-2, loopRounds:', loopRounds);
+      const fatigueMessage: Message = {
+        id: `fatigue-${Date.now()}`,
+        type: 'system',
+        content: JSON.stringify({
+          type: 'fatigue-check',
+          intensity: newIntensity,
+          initialIntensity,
+          round: sessionContext.round || 1,
+          loopRounds,
+          phraseType
+        }),
+        timestamp: new Date(),
+        sessionId: currentChatSession
+      };
+      const allMsgs = [...messages, fatigueMessage];
+      setMessages(allMsgs);
+      setConversationHistory(prev => [...prev, fatigueMessage]);
+      await persistMessages(allMsgs);
+      return;
+    }
+    
+    // Normal SUDS 1-2: Show 4-button choice
+    console.log('[useAIChat] SUDS 1-2 - showing choices');
     const choiceMessage: Message = {
       id: `choice-${Date.now()}`,
       type: 'system',
@@ -1106,6 +1226,7 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
       problem: undefined,
       feeling: undefined,
       bodyLocation: undefined,
+      loopRounds: 0, // Reset loop on conversation re-entry
     };
     setSessionContext(updatedContext);
     onSessionUpdate(updatedContext);
@@ -1125,6 +1246,59 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     
     onStateChange('conversation');
   }, [sessionContext, currentChatSession, messages, onStateChange, onSessionUpdate, persistMessages]);
+
+  // Body-based continue tapping (protective cognition) for high-SUDS stagnation
+  const handleBodyBasedContinue = useCallback(async (currentIntensity: number) => {
+    console.log('[useAIChat] Body-based continue with protective cognition, intensity:', currentIntensity);
+    
+    const newRound = (sessionContext.round || 0) + 1;
+    const updatedContext: SessionContext = {
+      ...sessionContext,
+      currentIntensity,
+      round: newRound,
+      setupStatements: PROTECTIVE_COGNITION_SETUP,
+      aiReminderPhrases: PROTECTIVE_COGNITION_REMINDERS,
+      statementOrder: [0, 1, 2, 0, 1, 2, 1, 0],
+      reminderPhraseType: 'acknowledging',
+      bodyBasedRoundDone: true,
+      loopRounds: 0, // Reset loop
+      peakSuds: Math.max(sessionContext.peakSuds || 0, currentIntensity),
+    };
+    setSessionContext(updatedContext);
+    onSessionUpdate(updatedContext);
+    
+    await registerNewRound(updatedContext, newRound);
+    setCurrentTappingPoint(0);
+    
+    const roundMessage: Message = {
+      id: `round-${Date.now()}`,
+      type: 'bot',
+      content: `Let's try something different. Instead of focusing on the story, let's focus on where you feel this in your body. You're safe right now. Take a deep breath... 💙`,
+      timestamp: new Date(),
+      sessionId: currentChatSession
+    };
+    const allMsgs = [...messages, roundMessage];
+    setMessages(allMsgs);
+    setConversationHistory(prev => [...prev, roundMessage]);
+    await persistMessages(allMsgs);
+    
+    setTimeout(() => {
+      onStateChange('setup');
+    }, 0);
+  }, [sessionContext, currentChatSession, messages, onStateChange, onSessionUpdate, persistMessages, registerNewRound]);
+
+  // Handle fatigue check responses
+  const handleFatigueContinue = useCallback(async (intensity: number, phraseType?: 'acknowledging' | 'partial-release' | 'full-release') => {
+    console.log('[useAIChat] Fatigue continue - resetting loop');
+    setSessionContext(prev => ({ ...prev, loopRounds: 0 }));
+    await startNewTappingRound(intensity, phraseType);
+  }, [startNewTappingRound]);
+
+  const handleFatiguePause = useCallback(async () => {
+    console.log('[useAIChat] Fatigue pause - going to quiet integration');
+    setSessionContext(prev => ({ ...prev, loopRounds: 0 }));
+    onStateChange('quiet-integration');
+  }, [onStateChange]);
 
   // Track support contact
   const handleSupportContacted = useCallback(async () => {
@@ -1210,6 +1384,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     handleTalkToTapaway,
     handleGreetingIntensity,
     handleQuietIntegrationComplete,
-    handleSupportContacted
+    handleSupportContacted,
+    handleBodyBasedContinue,
+    handleFatigueContinue,
+    handleFatiguePause
   };
 };
