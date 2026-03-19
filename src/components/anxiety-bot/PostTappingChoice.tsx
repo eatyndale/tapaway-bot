@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { RefreshCw, CheckCircle, AlertTriangle, Leaf, Phone } from "lucide-react";
+import { RefreshCw, CheckCircle, AlertTriangle, Leaf, Phone, Pause } from "lucide-react";
 
 interface PostTappingChoiceProps {
   intensity: number;
@@ -9,7 +9,9 @@ interface PostTappingChoiceProps {
   roundsWithoutReduction: number;
   highSudsRounds?: number;
   isTearlessTrauma?: boolean;
+  postBodyBased?: boolean;
   onContinueTapping: () => void;
+  onBodyBasedContinue?: () => void;
   onEndSession: () => void;
   onQuietIntegration?: () => void;
   onContactSupport?: () => void;
@@ -22,13 +24,14 @@ const PostTappingChoice = ({
   roundsWithoutReduction,
   highSudsRounds = 0,
   isTearlessTrauma = false,
+  postBodyBased = false,
   onContinueTapping,
+  onBodyBasedContinue,
   onEndSession,
   onQuietIntegration,
   onContactSupport
 }: PostTappingChoiceProps) => {
   const improvement = initialIntensity - intensity;
-  const improvementPercent = initialIntensity > 0 ? Math.round((improvement / initialIntensity) * 100) : 0;
 
   // SUDS 0: Auto-complete (handled by parent, but show completion message)
   if (intensity === 0) {
@@ -47,60 +50,121 @@ const PostTappingChoice = ({
     );
   }
 
-  // SUDS 8-10: Grounding + repeat tapping. After 3 rounds at 8-10, offer End + Contact Support
-  if (intensity >= 8) {
-    if (highSudsRounds >= 3) {
-      return (
-        <Card className="border-amber-200 bg-amber-50/50">
-          <CardContent className="p-4 space-y-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
-              <div className="space-y-2">
-                <h4 className="font-semibold text-foreground">
-                  You've been really brave
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Sometimes what we're carrying needs more support than tapping alone can provide. That's completely okay — it means you're dealing with something significant.
-                </p>
-              </div>
+  // ═══ SUDS 8-10: Post body-based round → final exit options ONLY ═══
+  if (intensity >= 8 && postBodyBased) {
+    return (
+      <Card className="border-amber-200 bg-amber-50/50">
+        <CardContent className="p-4 space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div className="space-y-2">
+              <h4 className="font-semibold text-foreground">
+                You've shown real courage today
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                Sometimes what we're carrying needs more support than tapping alone can provide right now. That's completely okay — it means you're dealing with something significant. You might find it helpful to come back to this later or work with a practitioner.
+              </p>
             </div>
+          </div>
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              {onContactSupport && (
-                <Button 
-                  onClick={onContactSupport}
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <Phone className="w-4 h-4" />
-                  Contact Support
-                </Button>
-              )}
+          <div className="flex flex-wrap gap-2 pt-2">
+            {onQuietIntegration && (
               <Button 
-                onClick={onEndSession}
+                onClick={onQuietIntegration}
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2"
               >
-                <CheckCircle className="w-4 h-4" />
-                End Session
+                <Leaf className="w-4 h-4" />
+                Quiet Integration
               </Button>
+            )}
+            {onContactSupport && (
               <Button 
-                onClick={onContinueTapping}
-                variant="outline"
+                onClick={onContactSupport}
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Phone className="w-4 h-4" />
+                Contact Support
+              </Button>
+            )}
+            <Button 
+              onClick={onEndSession}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <CheckCircle className="w-4 h-4" />
+              End Session
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ═══ SUDS 8-10 + 3 rounds: Three-option card with grounding ═══
+  if (intensity >= 8 && highSudsRounds >= 3) {
+    return (
+      <Card className="border-amber-200 bg-amber-50/50">
+        <CardContent className="p-4 space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div className="space-y-2">
+              <h4 className="font-semibold text-foreground">
+                Let's try a different approach
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                Take a moment. Feel your feet on the ground. Notice 3 things you can see around you.
+                You're safe right now. The intensity is staying high, so let's shift our approach.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-2">
+            {onBodyBasedContinue && (
+              <Button 
+                onClick={onBodyBasedContinue}
                 size="sm"
                 className="flex items-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" />
-                Try One More Round
+                Continue Tapping
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
+            )}
+            {onQuietIntegration && (
+              <Button 
+                onClick={onQuietIntegration}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Leaf className="w-4 h-4" />
+                Quiet Integration
+              </Button>
+            )}
+            <Button 
+              onClick={onEndSession}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <CheckCircle className="w-4 h-4" />
+              End Session
+            </Button>
+          </div>
 
-    // SUDS 8-10 but < 3 rounds: Grounding message + auto-repeat
+          <p className="text-xs text-muted-foreground italic">
+            You can pause and take slow breaths or look around your space.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // SUDS 8-10 but < 3 rounds: Grounding message + auto-repeat
+  if (intensity >= 8) {
     return (
       <Card className="border-blue-200 bg-blue-50/50">
         <CardContent className="p-4 space-y-4">
@@ -126,7 +190,7 @@ const PostTappingChoice = ({
     );
   }
 
-  // SUDS 3-7: Offer Continue or Chat. "End Session" only after 3 rounds without reduction
+  // SUDS 3-7: Offer Continue (no End Session unless stagnation, which is handled by auto-transition now)
   if (intensity >= 3) {
     return (
       <Card className="border-blue-200 bg-blue-50/50">
@@ -152,24 +216,13 @@ const PostTappingChoice = ({
               <RefreshCw className="w-4 h-4" />
               Continue Tapping
             </Button>
-            {roundsWithoutReduction >= 3 && (
-              <Button 
-                onClick={onEndSession}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <CheckCircle className="w-4 h-4" />
-                End Session
-              </Button>
-            )}
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  // SUDS 1-2: 4 buttons (Continue Tapping, Chat with Tapaway, Quiet Integration, End Session)
+  // SUDS 1-2: 3 buttons (Continue Tapping, Quiet Integration, End Session)
   return (
     <Card className="border-green-200 bg-green-50/50">
       <CardContent className="p-4 space-y-4">
@@ -179,8 +232,7 @@ const PostTappingChoice = ({
             Great progress!
           </h4>
           <p className="text-sm text-muted-foreground">
-            You've reduced your intensity from {initialIntensity}/10 to {intensity}/10 
-            {improvementPercent > 0 && ` (${improvementPercent}% improvement)`}. 
+            You've reduced your intensity from {initialIntensity}/10 to {intensity}/10. 
             What would you like to do next?
           </p>
         </div>
