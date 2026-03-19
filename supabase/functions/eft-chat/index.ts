@@ -600,7 +600,10 @@ serve(async (req) => {
       if (classification.extracted.bodyLocation) {
         sessionContext.bodyLocation = normalizeBodyLocation(classification.extracted.bodyLocation);
       }
-      if (classification.extracted.intensity !== null) {
+      // FIX: Only apply extracted intensity during states where SUDS rating is expected
+      // During conversation/conversation-deepening, numeric inputs are conversational, not formal SUDS
+      const intensityAllowedStates = ['gathering-intensity', 'post-tapping', 'tapping-breathing'];
+      if (classification.extracted.intensity !== null && intensityAllowedStates.includes(sanitizedChatState)) {
         sessionContext.currentIntensity = classification.extracted.intensity;
       }
     }
