@@ -34,6 +34,8 @@ interface SessionContext {
   quietIntegrationUsed?: boolean;
   sessionType?: SessionType;
   highSudsRounds?: number;
+  bodyBasedRoundDone?: boolean;
+  loopRounds?: number;
 }
 
 interface Directive {
