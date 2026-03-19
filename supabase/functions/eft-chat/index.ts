@@ -907,6 +907,11 @@ IMPORTANT: Do NOT ask for intensity yourself. Once you have all three pieces (pr
 
 If you only have 1 or 2 pieces, keep the conversation flowing naturally to gather the missing piece(s).
 
+**EMOTION → NOUN CONVERSION (use these exact conversions):**
+anxious → anxiety, sad → sadness, stressed → stress, overwhelmed → overwhelm
+tired → tiredness, worried → worry, scared → fear, frustrated → frustration
+For unusual emotions, add "feeling": mumu-ish → "this mumu-ish feeling"
+
 Then include: <<DIRECTIVE {"next_state":"gathering-intensity","collect":"intensity"}>>
 
 **IMPORTANT RULES:**
