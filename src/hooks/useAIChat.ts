@@ -106,6 +106,24 @@ const TEARLESS_REMINDER_PHRASES = [
   "Whatever this is, I'm letting it settle."
 ];
 
+// Protective cognition setup statements (for high-SUDS body-based tapping)
+const PROTECTIVE_COGNITION_SETUP = [
+  "Even though this feels really intense, I'm safe right now.",
+  "Even though this is a lot, I don't have to deal with it all at once.",
+  "Even though my body is holding so much, I choose to stay present."
+];
+
+const PROTECTIVE_COGNITION_REMINDERS = [
+  "This intensity in my body...",
+  "I notice where I feel it...",
+  "I'm safe in this moment...",
+  "Letting my body soften...",
+  "I don't have to fix it all now...",
+  "My body knows how to settle...",
+  "I'm present and I'm okay...",
+  "Allowing this to move through me..."
+];
+
 export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, onTypoCorrection }: UseAIChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
