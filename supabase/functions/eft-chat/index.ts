@@ -622,7 +622,8 @@ serve(async (req) => {
       const feeling = sessionContext.feeling;
       const location = sessionContext.bodyLocation;
       const problem = sessionContext.problem;
-      const intensity = sessionContext.currentIntensity || sessionContext.initialIntensity || 5;
+      // FIX: Use initialIntensity only — user hasn't given a formal SUDS rating during conversation
+      const intensity = sessionContext.initialIntensity || 5;
 
       // Generate setup statements via tool calling (same tool as gathering-intensity)
       const setupToolDef = {
