@@ -392,6 +392,7 @@ const AIAnxietyBot = () => {
                               roundsWithoutReduction={parsed.roundsWithoutReduction}
                               highSudsRounds={parsed.highSudsRounds}
                               isTearlessTrauma={parsed.isTearlessTrauma}
+                              postBodyBased={parsed.postBodyBased}
                               onContinueTapping={() => {
                                 if (parsed.intensity >= 1 && parsed.intensity <= 7) {
                                   handleTalkToTapaway();
@@ -399,9 +400,23 @@ const AIAnxietyBot = () => {
                                   handleContinueTapping(parsed.intensity, parsed.phraseType);
                                 }
                               }}
+                              onBodyBasedContinue={() => handleBodyBasedContinue(parsed.intensity)}
                               onEndSession={handleEndSession}
                               onQuietIntegration={handleQuietIntegration}
                               onContactSupport={handleContactSupport}
+                            />
+                          );
+                        }
+                        
+                        if (parsed.type === 'fatigue-check') {
+                          return (
+                            <FatigueCheck
+                              key={message.id}
+                              round={parsed.round}
+                              intensity={parsed.intensity}
+                              onContinue={() => handleFatigueContinue(parsed.intensity, parsed.phraseType)}
+                              onPause={handleFatiguePause}
+                              onEnd={handleEndSession}
                             />
                           );
                         }
