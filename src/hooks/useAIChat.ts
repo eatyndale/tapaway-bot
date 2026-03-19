@@ -1384,6 +1384,9 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
     handleTalkToTapaway,
     handleGreetingIntensity,
     handleQuietIntegrationComplete,
-    handleSupportContacted
+    handleSupportContacted,
+    handleBodyBasedContinue,
+    handleFatigueContinue,
+    handleFatiguePause
   };
 };
