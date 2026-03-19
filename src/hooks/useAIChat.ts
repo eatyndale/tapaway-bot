@@ -593,6 +593,11 @@ export const useAIChat = ({ onStateChange, onSessionUpdate, onCrisisDetected, on
         if (data.extractedContext.deepeningQuestionCount !== undefined) {
           persistedContext.deepeningQuestionCount = data.extractedContext.deepeningQuestionCount;
         }
+        // FIX: Never overwrite initialIntensity after it's been set during greeting
+        // initialIntensity is immutable once set by handleGreetingIntensity
+        if (data.extractedContext.initialIntensity !== undefined && !persistedContext.initialIntensity) {
+          persistedContext.initialIntensity = data.extractedContext.initialIntensity;
+        }
         setSessionContext(persistedContext);
         onSessionUpdate(persistedContext);
       }

@@ -600,7 +600,10 @@ serve(async (req) => {
       if (classification.extracted.bodyLocation) {
         sessionContext.bodyLocation = normalizeBodyLocation(classification.extracted.bodyLocation);
       }
-      if (classification.extracted.intensity !== null) {
+      // FIX: Only apply extracted intensity during states where SUDS rating is expected
+      // During conversation/conversation-deepening, numeric inputs are conversational, not formal SUDS
+      const intensityAllowedStates = ['gathering-intensity', 'post-tapping', 'tapping-breathing'];
+      if (classification.extracted.intensity !== null && intensityAllowedStates.includes(sanitizedChatState)) {
         sessionContext.currentIntensity = classification.extracted.intensity;
       }
     }
@@ -619,7 +622,8 @@ serve(async (req) => {
       const feeling = sessionContext.feeling;
       const location = sessionContext.bodyLocation;
       const problem = sessionContext.problem;
-      const intensity = sessionContext.currentIntensity || sessionContext.initialIntensity || 5;
+      // FIX: Use initialIntensity only — user hasn't given a formal SUDS rating during conversation
+      const intensity = sessionContext.initialIntensity || 5;
 
       // Generate setup statements via tool calling (same tool as gathering-intensity)
       const setupToolDef = {
@@ -899,8 +903,9 @@ User: "I'm stressed about work"
 You: "Work stress is the worst — it can just sit with you all day. Where do you feel that stress showing up in your body? Some people feel it in their chest, shoulders, stomach... everyone's different."
 
 **TRANSITION TO INTENSITY:**
-The moment you are 90%+ confident you have all three pieces (pull from conversation history if needed), smoothly transition:
-"Got it ${capitalizedName} — this [emotion as NOUN] about [situation], sitting in your [location]. How intense is that right now on a 0–10?"
+IMPORTANT: Do NOT ask for intensity yourself. Once you have all three pieces (problem, emotion, body location), the system will automatically handle the transition. Your response should simply acknowledge and reflect what they've shared — warmly summarize what you've heard. Do NOT include phrases like "How intense is that on a 0-10?" or ask for a rating.
+
+If you only have 1 or 2 pieces, keep the conversation flowing naturally to gather the missing piece(s).
 
 **EMOTION → NOUN CONVERSION (use these exact conversions):**
 anxious → anxiety, sad → sadness, stressed → stress, overwhelmed → overwhelm
