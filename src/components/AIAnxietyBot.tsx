@@ -13,6 +13,7 @@ import IntensitySlider from "./anxiety-bot/IntensitySlider";
 import TappingGuide from "./anxiety-bot/TappingGuide";
 import SetupPhase from "./anxiety-bot/SetupPhase";
 import PostTappingChoice from "./anxiety-bot/PostTappingChoice";
+import FatigueCheck from "./anxiety-bot/FatigueCheck";
 import CrisisSupport from "./anxiety-bot/CrisisSupport";
 import ChatMessage from "./anxiety-bot/ChatMessage";
 import LoadingIndicator from "./anxiety-bot/LoadingIndicator";
