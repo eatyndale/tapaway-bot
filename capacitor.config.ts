@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.06fba0130ca242c8b6694adcf9e55711',
+  appId: 'app.lovable.tapaway',
   appName: 'tapaway',
   webDir: 'dist',
   server: {
