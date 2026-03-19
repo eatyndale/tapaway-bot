@@ -61,7 +61,10 @@ const AIAnxietyBot = () => {
     handleTalkToTapaway,
     handleGreetingIntensity,
     handleQuietIntegrationComplete,
-    handleSupportContacted
+    handleSupportContacted,
+    handleBodyBasedContinue,
+    handleFatigueContinue,
+    handleFatiguePause
   } = useAIChat({
     onStateChange: (newState) => {
       console.log('State change:', chatState, '->', newState);
