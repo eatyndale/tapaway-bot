@@ -1,29 +1,45 @@
 
 
-## Make the Android App Load Local Assets (Production Mode)
+## Update README.md — Keep It Current
 
-### Problem
-The `capacitor.config.ts` has a `server.url` that points to the remote Lovable preview, so the app always loads from the internet like a browser. This is development mode.
+### Changes Needed
 
-### Plan
+The README is mostly accurate but has several gaps and a stale project structure listing. Here is what will be updated:
 
-**Step 1: Update `capacitor.config.ts`**
-- Remove (or comment out) the `server` block so Capacitor loads from the local `dist/` assets bundled into the APK.
+---
 
-**Step 2: User runs locally**
-After the change, the user needs to:
-```bash
-git pull
-npm install
-npm run build
-npx cap copy android
-npx cap sync android
-```
-Then click **Run ▶** in Android Studio.
+### 1. Technology Stack Table
+**Add Capacitor** as a row for mobile/native packaging:
+| **Mobile** | Capacitor (Android) |
 
-### Result
-The app will load from bundled local files — works offline, loads faster, and behaves like a true native app. The remote `server` config can be re-added anytime for development/hot-reload.
+---
+
+### 2. Project Structure Tree
+The current tree is missing many components that now exist. Updates:
+
+- **anxiety-bot/** — Add the 12+ missing subcomponents: `AdviceDisplay`, `ChatHeader`, `ChatHistory`, `ChatInput`, `ChatMessage`, `FatigueCheck`, `GreetingIntensity`, `LoadingIndicator`, `LocalChatHistory`, `PostTappingChoice`, `Questionnaire`, `QuestionnaireView`, `QuietIntegration`, `SessionActions`, `SessionComplete`, `SetupStatements`, `types.ts`
+- **landing/** — Add new section: `BenefitsSection.tsx`, `ScienceSection.tsx`, `TestimonialsSection.tsx`, `WhatIsTapaway.tsx`
+- **src/assets/** — Add `setup-meditation.gif`, `setup-meditation.png`
+- **Root** — Add `capacitor.config.ts`
+- **Remove** `METHODOLOGY_*.md` reference (no such files exist in the repo)
+
+---
+
+### 3. Edge Function Request/Response
+Update the request body to match the actual `eft-chat` function signature, which uses `chatState`, `userName`, `currentTappingPoint`, `intensityHistory`, `lastAssistantMessage` — not `conversationHistory` and `sessionContext` as currently documented.
+
+---
+
+### 4. Published URL
+Add the live URL (`https://tapaway.lovable.app`) near the top of the README.
+
+---
+
+### 5. Database Schema
+Add the `evaluation_results` and `human_evaluations` tables that exist in the types file but are missing from the README.
+
+---
 
 ### Technical Detail
-The only file changed is `capacitor.config.ts` — the `server` property is removed. Everything else stays the same.
+Only `README.md` is modified. No code or configuration changes.
 
