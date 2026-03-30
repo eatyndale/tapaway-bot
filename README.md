@@ -2,6 +2,8 @@
 
 **AI-Powered EFT Tapping for Anxiety Relief**
 
+🔗 **Live App**: [https://tapaway.lovable.app](https://tapaway.lovable.app)
+
 A React-based web application that guides users through Emotional Freedom Techniques (EFT) tapping sessions using an AI conversational agent, designed to reduce anxiety through structured, evidence-based interventions.
 
 ---
@@ -40,6 +42,7 @@ Tapaway is a digital mental health tool developed as part of a Design Science Re
 | **AI** | OpenAI GPT-4o-mini with Bounded Generative Framework |
 | **State Management** | TanStack React Query |
 | **Routing** | React Router v6 |
+| **Mobile** | Capacitor (Android) |
 
 ---
 
@@ -54,10 +57,33 @@ Tapaway is a digital mental health tool developed as part of a Design Science Re
 │   ├── components/
 │   │   ├── anxiety-bot/          # AI chatbot components
 │   │   │   ├── ChatInterface.tsx # Main chat UI
+│   │   │   ├── ChatHeader.tsx    # Chat header with session info
+│   │   │   ├── ChatHistory.tsx   # Past session browser
+│   │   │   ├── ChatInput.tsx     # User input area
+│   │   │   ├── ChatMessage.tsx   # Individual message rendering
 │   │   │   ├── TappingGuide.tsx  # Visual tapping instructions
-│   │   │   ├── SetupPhase.tsx    # EFT setup statements
+│   │   │   ├── SetupPhase.tsx    # EFT setup phase flow
+│   │   │   ├── SetupStatements.tsx # Setup statement display
 │   │   │   ├── IntensitySlider.tsx # SUDS rating input
-│   │   │   └── CrisisSupport.tsx # Crisis intervention display
+│   │   │   ├── GreetingIntensity.tsx # Initial distress rating
+│   │   │   ├── CrisisSupport.tsx # Crisis intervention display
+│   │   │   ├── AdviceDisplay.tsx # Post-session advice
+│   │   │   ├── FatigueCheck.tsx  # Session fatigue monitoring
+│   │   │   ├── LoadingIndicator.tsx # Typing/loading animation
+│   │   │   ├── LocalChatHistory.tsx # Local session storage
+│   │   │   ├── PostTappingChoice.tsx # Post-round options
+│   │   │   ├── Questionnaire.tsx # In-bot questionnaire
+│   │   │   ├── QuestionnaireView.tsx # Questionnaire UI wrapper
+│   │   │   ├── QuietIntegration.tsx # Quiet integration pause
+│   │   │   ├── SessionActions.tsx # Session control buttons
+│   │   │   ├── SessionComplete.tsx # Session completion summary
+│   │   │   ├── SessionProgress.tsx # Live session progress card
+│   │   │   └── types.ts          # Shared TypeScript types
+│   │   ├── landing/              # Landing page sections
+│   │   │   ├── BenefitsSection.tsx
+│   │   │   ├── ScienceSection.tsx
+│   │   │   ├── TestimonialsSection.tsx
+│   │   │   └── WhatIsTapaway.tsx
 │   │   ├── ui/                   # Shadcn/ui components
 │   │   ├── AIAnxietyBot.tsx      # Main bot orchestrator
 │   │   ├── AuthForm.tsx          # Authentication UI
@@ -80,7 +106,7 @@ Tapaway is a digital mental health tool developed as part of a Design Science Re
 │   ├── functions/
 │   │   └── eft-chat/             # AI conversation edge function
 │   └── migrations/               # Database schema migrations
-└── METHODOLOGY_*.md              # Research documentation
+└── capacitor.config.ts           # Capacitor mobile configuration
 ```
 
 ---
@@ -134,6 +160,10 @@ Configure the following secret in Supabase Edge Functions:
 | `assessments` | PHQ-9 assessment results with severity classification |
 | `chat_sessions` | AI conversation history with crisis detection flags |
 | `tapping_sessions` | EFT session data with intensity ratings and improvement metrics |
+| `evaluation_results` | AI model evaluation outputs (latency, token usage, directive validity) |
+| `evaluation_runs` | Batched evaluation run metadata |
+| `evaluation_test_cases` | Test inputs for AI evaluation (category, expected intent/directive) |
+| `human_evaluations` | Human rater scores for AI responses (empathy, protocol, language) |
 
 ### Key Fields in `tapping_sessions`
 
@@ -147,6 +177,9 @@ Configure the following secret in Supabase Edge Functions:
 - rounds_completed: int   -- Number of tapping rounds
 - setup_statements: text[] -- Personalized affirmations
 - reminder_phrases: text[] -- Tapping point phrases
+- is_tearless_trauma: bool -- Whether tearless trauma technique was used
+- session_type: text       -- Session approach (traditional/tearless/mixed)
+- peak_suds: int           -- Highest SUDS recorded during session
 ```
 
 ---
@@ -163,15 +196,19 @@ The core AI conversation handler implementing the Bounded Generative Framework.
 ```json
 {
   "message": "string",
-  "conversationHistory": [],
+  "chatState": "conversation | gathering-intensity | setup | tapping-point | ...",
+  "userName": "string",
   "sessionContext": {
     "problem": "string",
     "feeling": "string",
     "bodyLocation": "string",
     "intensity": 0,
-    "currentRound": 1,
-    "conversationState": "conversation"
-  }
+    "currentRound": 1
+  },
+  "conversationHistory": [],
+  "currentTappingPoint": "string | null",
+  "intensityHistory": [],
+  "lastAssistantMessage": "string"
 }
 ```
 
@@ -179,24 +216,27 @@ The core AI conversation handler implementing the Bounded Generative Framework.
 ```json
 {
   "response": "string",
-  "directive": {
-    "type": "continue_conversation | gather_intensity | start_tapping | ...",
-    "data": {}
-  },
-  "intent": "string",
-  "updatedContext": {},
-  "isCrisis": false
+  "crisisDetected": false,
+  "extractedContext": {
+    "problem": "string",
+    "feeling": "string",
+    "bodyLocation": "string",
+    "intensity": 0
+  }
 }
 ```
 
 **Conversation States**:
 1. `conversation` - Initial problem gathering
-2. `gathering-intensity` - SUDS rating collection
-3. `setup` - Setup statement presentation
-4. `tapping-point` - Active tapping guidance
-5. `tapping-breathing` - Breathing exercises
-6. `post-tapping` - Post-round assessment
-7. `advice` - Session conclusion
+2. `conversation-deepening` - Deeper exploration of feelings
+3. `gathering-intensity` - SUDS rating collection
+4. `tearless-setup` - Tearless trauma setup
+5. `setup` - Setup statement presentation
+6. `tapping-point` - Active tapping guidance
+7. `tapping-breathing` - Breathing exercises
+8. `post-tapping` - Post-round assessment
+9. `quiet-integration` - Integration pause
+10. `advice` - Session conclusion
 
 ---
 
@@ -239,7 +279,7 @@ The core AI conversation handler implementing the Bounded Generative Framework.
     │    │    │
     ▼    │    ▼
 ┌───────┐│┌─────────┐
-│Another││ │Complete │
+│Another│││Complete │
 │ Round │││ Session │
 └───┬───┘│└─────────┘
     │    │
