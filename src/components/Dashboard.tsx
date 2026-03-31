@@ -208,7 +208,7 @@ const Dashboard = ({ onSignOut }: DashboardProps) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full">Start Assessment</Button>
+              <Button className="w-full bg-[#4dbad1] hover:bg-[#3da3ba] text-white">Start Assessment</Button>
             </CardContent>
           </Card>
           
