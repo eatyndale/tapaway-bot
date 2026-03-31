@@ -13,6 +13,7 @@ A React-based web application that guides users through Emotional Freedom Techni
 Tapaway is a digital mental health tool developed as part of a Design Science Research (DSR) project investigating the efficacy of AI-delivered EFT interventions. The application combines conversational AI with the clinical EFT protocol to provide accessible, personalized anxiety relief.
 
 ### Key Outcomes
+
 - **Mean SUDS Reduction**: 4.28 points (from 7.22 to 2.94)
 - **Effect Size**: Cohen's d = 2.16 [95% CI: 1.61, 2.71]
 - **Completion Rate**: 68 completed sessions
@@ -34,15 +35,15 @@ Tapaway is a digital mental health tool developed as part of a Design Science Re
 
 ## Technology Stack
 
-| Layer | Technology |
-|-------|------------|
-| **Frontend** | React 18, TypeScript, Vite |
-| **Styling** | Tailwind CSS, Radix UI, Shadcn/ui |
-| **Backend** | Supabase (Auth, PostgreSQL, Edge Functions) |
-| **AI** | OpenAI GPT-4o-mini with Bounded Generative Framework |
-| **State Management** | TanStack React Query |
-| **Routing** | React Router v6 |
-| **Mobile** | Capacitor (Android) |
+| Layer                | Technology                                           |
+| -------------------- | ---------------------------------------------------- |
+| **Frontend**         | React 18, TypeScript, Vite                           |
+| **Styling**          | Tailwind CSS, Radix UI, Shadcn/ui                    |
+| **Backend**          | Supabase (Auth, PostgreSQL, Edge Functions)          |
+| **AI**               | OpenAI GPT-4o-mini with Bounded Generative Framework |
+| **State Management** | TanStack React Query                                 |
+| **Routing**          | React Router v6                                      |
+| **Mobile**           | Capacitor (Android)                                  |
 
 ---
 
@@ -154,16 +155,16 @@ Configure the following secret in Supabase Edge Functions:
 
 ### Tables
 
-| Table | Purpose |
-|-------|---------|
-| `profiles` | User profile data (name, email, age_group, industry) |
-| `assessments` | PHQ-9 assessment results with severity classification |
-| `chat_sessions` | AI conversation history with crisis detection flags |
-| `tapping_sessions` | EFT session data with intensity ratings and improvement metrics |
-| `evaluation_results` | AI model evaluation outputs (latency, token usage, directive validity) |
-| `evaluation_runs` | Batched evaluation run metadata |
-| `evaluation_test_cases` | Test inputs for AI evaluation (category, expected intent/directive) |
-| `human_evaluations` | Human rater scores for AI responses (empathy, protocol, language) |
+| Table                   | Purpose                                                                |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `profiles`              | User profile data (name, email, age_group, industry)                   |
+| `assessments`           | PHQ-9 assessment results with severity classification                  |
+| `chat_sessions`         | AI conversation history with crisis detection flags                    |
+| `tapping_sessions`      | EFT session data with intensity ratings and improvement metrics        |
+| `evaluation_results`    | AI model evaluation outputs (latency, token usage, directive validity) |
+| `evaluation_runs`       | Batched evaluation run metadata                                        |
+| `evaluation_test_cases` | Test inputs for AI evaluation (category, expected intent/directive)    |
+| `human_evaluations`     | Human rater scores for AI responses (empathy, protocol, language)      |
 
 ### Key Fields in `tapping_sessions`
 
@@ -193,6 +194,7 @@ The core AI conversation handler implementing the Bounded Generative Framework.
 **Endpoint**: `POST /functions/v1/eft-chat`
 
 **Request Body**:
+
 ```json
 {
   "message": "string",
@@ -213,6 +215,7 @@ The core AI conversation handler implementing the Bounded Generative Framework.
 ```
 
 **Response**:
+
 ```json
 {
   "response": "string",
@@ -227,6 +230,7 @@ The core AI conversation handler implementing the Bounded Generative Framework.
 ```
 
 **Conversation States**:
+
 1. `conversation` - Initial problem gathering
 2. `conversation-deepening` - Deeper exploration of feelings
 3. `gathering-intensity` - SUDS rating collection
@@ -291,19 +295,25 @@ The core AI conversation handler implementing the Bounded Generative Framework.
 ## Key Design Principles
 
 ### 1. Bounded Generativity
+
 The AI operates within strict therapeutic boundaries defined by the Clinical EFT protocol. Responses are constrained to the current conversation state to ensure protocol fidelity.
 
 ### 2. Somatic Recognition
+
 The system explicitly acknowledges physical manifestations of anxiety, asking users to identify where they feel sensations in their body (e.g., "tight chest", "knot in stomach").
 
 ### 3. Linguistic Attunement
+
 Setup statements and reminder phrases use the user's own words verbatim, maintaining authenticity and personal relevance:
+
 > "Even though I feel [user's feeling] about [user's problem], I deeply and completely accept myself."
 
 ### 4. Crisis Detection Architecture
+
 Real-time monitoring for crisis indicators (suicidal ideation, self-harm) with immediate escalation to professional resources. The AI provides crisis hotlines and encourages professional help.
 
 ### 5. Context Persistence
+
 Session context flows through the entire conversation, maintaining coherence across multiple tapping rounds and enabling personalized guidance.
 
 ---
@@ -317,13 +327,13 @@ This application was developed as part of a Design Science Research project inve
 
 ### Key Findings
 
-| Metric | Value |
-|--------|-------|
-| Sample Size | n = 68 completed sessions |
-| Mean Initial SUDS | 7.22 (SD = 1.64) |
-| Mean Final SUDS | 2.94 (SD = 2.36) |
-| Mean Improvement | 4.28 points |
-| Cohen's d | 2.16 [95% CI: 1.61, 2.71] |
+| Metric            | Value                     |
+| ----------------- | ------------------------- |
+| Sample Size       | n = 68 completed sessions |
+| Mean Initial SUDS | 7.22 (SD = 1.64)          |
+| Mean Final SUDS   | 2.94 (SD = 2.36)          |
+| Mean Improvement  | 4.28 points               |
+| Cohen's d         | 2.16 [95% CI: 1.61, 2.71] |
 
 The effect size falls within the range of human-delivered EFT meta-analyses (Clond, 2016: d = 1.23 [0.82, 1.64]), suggesting AI-delivered EFT produces effects at least comparable to traditional formats.
 
@@ -368,7 +378,7 @@ Contributions are welcome! Please follow these guidelines:
 
 ## License
 
-This project is part of academic research. Please contact the author for licensing information.
+This project belongs to Health Perks. Please contact Health Perks Ltd for licensing information.
 
 ---
 
@@ -383,4 +393,4 @@ This project is part of academic research. Please contact the author for licensi
 
 ## Support
 
-For issues or questions, please open a GitHub issue or contact the research team.
+For issues or questions, please contact Health Perks Ltd.
